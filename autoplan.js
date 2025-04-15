@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const getNextSplit = require('./getNextSplit');
 require('dotenv').config();
+const getWeeklyTargetSplit = require('./getWeeklyTargetSplit');
 
 const API_KEY = process.env.HEVY_API_KEY;
 const BASE_URL = 'https://api.hevyapp.com/v1';
@@ -672,7 +673,7 @@ async function autoplan({ workouts, templates, routines }) {
     exerciseTemplates = templates.filter(t => !excludedExercises.has(t.title));
     historyAnalysis = analyzeHistory(workouts);
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
-    const workoutType = getNextSplit();
+    const workoutType = getWeeklyTargetSplit();
     const muscleGroups = muscleTargets[workoutType];
     console.log("🧠 Split selected:", workoutType);
 
