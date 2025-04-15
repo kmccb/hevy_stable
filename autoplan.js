@@ -4,6 +4,8 @@ const path = require('path');
 const getNextSplit = require('./getNextSplit');
 require('dotenv').config();
 const getWeeklyTargetSplit = require('./getWeeklyTargetSplit');
+const filterForVariety = require('./filterForVariety');
+
 
 const API_KEY = process.env.HEVY_API_KEY;
 const BASE_URL = 'https://api.hevyapp.com/v1';
@@ -238,12 +240,13 @@ function determineWorkoutType(historyAnalysis, lastCompletedWorkout, allWorkouts
   return fallback;
 }
 
+const varietyFilter = filterForVariety(workouts); // pass in 30-day workout history
 
-function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysis, numExercises = 4) {
+function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysis, varietyFilter, numExercises = 4) {
   const usedTitles = new Set();
   const selectedExercises = [];
-  const availableTemplates = [...templates];
 
+  // Sort muscle groups by how undertrained they are
   const sortedMuscleGroups = [...muscleGroups].sort((a, b) => {
     const freqA = historyAnalysis.muscleGroupFrequency[a.toLowerCase()] || 0;
     const freqB = historyAnalysis.muscleGroupFrequency[b.toLowerCase()] || 0;
@@ -251,9 +254,14 @@ function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysi
   });
 
   for (const muscle of sortedMuscleGroups) {
-    const candidates = availableTemplates.filter(t => {
+    const candidates = templates.filter(t => {
       const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
-      return primaryMatch && !recentTitles.has(t.title) && !usedTitles.has(t.title);
+      return (
+        primaryMatch &&
+        !recentTitles.has(t.title) &&
+        !usedTitles.has(t.title) &&
+        varietyFilter(t) // ✅ NEW VARIETY FILTER HERE
+      );
     });
 
     if (candidates.length > 0) {
@@ -269,21 +277,30 @@ function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysi
       const note = progression
         ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
         : "Start moderate and build";
+
       console.log(`✅ Selected: ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
+
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ No suitable template found for ${muscle}. Available templates:`, availableTemplates
-        .filter(t => (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase()))
-        .map(t => t.title));
+      console.log(`⚠️ No suitable template found for ${muscle}. Available templates:`,
+        templates
+          .filter(t => (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase()))
+          .map(t => t.title));
     }
   }
 
+  // If not enough selected, randomly fill the rest from the target pool
   while (selectedExercises.length < numExercises) {
     const muscle = sortedMuscleGroups[Math.floor(Math.random() * sortedMuscleGroups.length)];
-    const candidates = availableTemplates.filter(t => {
+    const candidates = templates.filter(t => {
       const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
-      return primaryMatch && !recentTitles.has(t.title) && !usedTitles.has(t.title);
+      return (
+        primaryMatch &&
+        !recentTitles.has(t.title) &&
+        !usedTitles.has(t.title) &&
+        varietyFilter(t) // ✅ Still applies here
+      );
     });
 
     if (candidates.length === 0) {
@@ -303,13 +320,16 @@ function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysi
     const note = progression
       ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
       : "Start moderate and build";
+
     console.log(`✅ Selected (additional): ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
+
     selectedExercises.push({ ...selected, note });
     usedTitles.add(selected.title);
   }
 
   return selectedExercises;
 }
+
 
 function pickAbsExercises(templates, recentTitles, numExercises = 4) {
   const absMuscles = ['abdominals', 'obliques'];
@@ -766,7 +786,8 @@ updatedRoutines.forEach(r => console.log(`– ${r.title}`));
         const absExercises = pickAbsExercises(exerciseTemplates, historyAnalysis.recentTitles, 4);
         routine = await updateRoutine(existingRoutine.id, 'Cardio', cardioExercises, absExercises);
       } else {
-        const mainExercises = pickExercises(exerciseTemplates, muscleTargets[workoutType], historyAnalysis.recentTitles, historyAnalysis.progressionAnalysis, 4);
+        const mainExercises = pickExercises(exerciseTemplates, muscleTargets[workoutType], historyAnalysis.recentTitles, historyAnalysis.progressionAnalysis, varietyFilter, 4);
+
         const absExercises = pickAbsExercises(exerciseTemplates, historyAnalysis.recentTitles, 4);
         routine = await updateRoutine(existingRoutine.id, workoutType, mainExercises, absExercises);
       }
