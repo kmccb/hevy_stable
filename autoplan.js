@@ -394,7 +394,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   const routinePayload = {
     title: `CoachGPT – ${workoutType} + Abs`,
-    notes: "Focus on form over weight. Supersets + finishers for max impact. 💥",
+    notes: "Core focus + stability + abs finishers. Push your pace 💥",
     exercises: []
   };
 
@@ -438,7 +438,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     usedExerciseIds.add(abs.id);
   }
 
-  // 💪 Add up to 3 solo strength finishers
+  // 💪 Add up to 3 solo strength/abs finishers
   const remainingStrengths = validExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 3);
   for (const ex of remainingStrengths) {
     const weight = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
@@ -457,7 +457,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 7) break;
   }
 
-  // 🔥 Abs finisher if room
+  // 🔥 Abs finisher
   const remainingAbs = validAbsExercises.filter(ex => !usedExerciseIds.has(ex.id));
   if (allExercises.length < 8 && remainingAbs.length > 0) {
     const abs = remainingAbs[0];
@@ -476,7 +476,43 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     usedExerciseIds.add(abs.id);
   }
 
-  // ✂️ Cap at 8 total exercises
+  // 🧠 Fallback core padding (if Core day < 8)
+  if (workoutType === "Core" && allExercises.length < 8) {
+    const fallbackTitles = [
+      'Bird Dog',
+      'Superman',
+      'Side Plank',
+      'Hollow Rock',
+      'V-Up',
+      'Plank to Pushup',
+      'Weighted Sit Up',
+      'Kneeling Cable Crunch',
+      'Spiderman',
+      'Lying Knee Raise'
+    ];
+    const unusedFallbacks = fallbackTitles
+      .map(title => exerciseTemplates.find(t => t.title === title))
+      .filter(t => t && !usedExerciseIds.has(t.id));
+
+    for (const fallback of unusedFallbacks) {
+      const sets = isDurationBased(fallback)
+        ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 })
+        : Array(3).fill({ type: 'normal', reps: 10, weight_kg: findSimilarExerciseWeight(fallback, historyAnalysis.progressionAnalysis) });
+
+      allExercises.push({
+        exercise_template_id: fallback.id,
+        superset_id: null,
+        rest_seconds: 45,
+        notes: "Core filler – maintain control",
+        sets
+      });
+
+      usedExerciseIds.add(fallback.id);
+      if (allExercises.length >= 8) break;
+    }
+  }
+
+  // ✂️ Cap to exactly 8
   if (allExercises.length > 8) {
     allExercises.length = 8;
     console.warn("⚠️ Routine trimmed to 8 exercises.");
@@ -495,6 +531,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   return routinePayload;
 }
+
 
 
 
