@@ -633,6 +633,8 @@ async function autoplan({ workouts, templates, routines }) {
     historyAnalysis = analyzeHistory(workouts);
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
     const workoutType = getNextSplit();
+    const muscleGroups = muscleTargets[workoutType];
+
 
     const today = new Date();
     writeLastScheduled(workoutType, today);
