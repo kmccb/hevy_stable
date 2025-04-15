@@ -441,7 +441,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   return routinePayload;
 }
-console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(routinePayload, null, 2));
+
 
 async function createRoutine(workoutType, exercises, absExercises) {
   const routinePayload = buildRoutinePayload(workoutType, exercises, absExercises);
