@@ -634,6 +634,12 @@ async function autoplan({ workouts, templates, routines }) {
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
     const workoutType = getNextSplit();
     const muscleGroups = muscleTargets[workoutType];
+    console.log("🧠 Split selected:", workoutType);
+
+    if (!muscleGroups || !Array.isArray(muscleGroups)) {
+      throw new Error(`❌ Invalid workoutType or missing muscle groups for: ${workoutType}`);
+    }
+    
 
 
     const today = new Date();
