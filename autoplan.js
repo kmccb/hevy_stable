@@ -446,14 +446,17 @@ console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(rou
 async function createRoutine(workoutType, exercises, absExercises) {
   const routinePayload = buildRoutinePayload(workoutType, exercises, absExercises);
 
-  console.log(`🔍 First exercise in payload: ${routinePayload.exercises[0]?.exercise_template_id} (Title: ${exercises[0]?.title || absExercises[0]?.title})`);
-
+  // 🔒 Prevent undefined folder_id errors
   delete routinePayload.routine_folder_id;
   delete routinePayload.folder_id;
-
+  
   const payload = {
     routine: routinePayload
   };
+  
+  // ✅ Log final payload
+  console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));
+  
 
   console.log('📤 Routine payload (create):', JSON.stringify(payload, null, 2));
 
