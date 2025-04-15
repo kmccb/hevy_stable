@@ -240,7 +240,7 @@ function determineWorkoutType(historyAnalysis, lastCompletedWorkout, allWorkouts
   return fallback;
 }
 
-const varietyFilter = filterForVariety(workouts); // pass in 30-day workout history
+
 
 function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysis, varietyFilter, numExercises = 4) {
   const usedTitles = new Set();
@@ -692,6 +692,7 @@ async function autoplan({ workouts, templates, routines }) {
   try {
     exerciseTemplates = templates.filter(t => !excludedExercises.has(t.title));
     historyAnalysis = analyzeHistory(workouts);
+    const varietyFilter = filterForVariety(workouts); // pass in 30-day workout history
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
     const workoutType = getWeeklyTargetSplit();
     const muscleGroups = muscleTargets[workoutType];
