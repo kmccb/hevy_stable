@@ -458,7 +458,7 @@ async function createRoutine(workoutType, exercises, absExercises) {
   console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));
   
 
-  console.log('📤 Routine payload (create):', JSON.stringify(payload, null, 2));
+  // console.log('📤 Routine payload (create):', JSON.stringify(payload, null, 2));
 
   try {
     const response = await makeApiRequestWithRetry('post', `${BASE_URL}/routines`, payload, headers);
@@ -605,6 +605,9 @@ async function autoplan({ workouts, templates, routines }) {
       console.warn('⚠️ No routines available after all fallbacks. Proceeding to create a new routine.');
       updatedRoutines = [];
     }
+
+    console.log("🔍 Checking for existing CoachGPT routine. Titles found:");
+updatedRoutines.forEach(r => console.log(`– ${r.title}`));
 
     let existingRoutine = updatedRoutines.find(r => r.title && typeof r.title === 'string' && r.title.includes('CoachGPT'));
     console.log(`🔍 Existing CoachGPT routine: ${existingRoutine ? `Found (ID: ${existingRoutine.id}, Title: ${existingRoutine.title}, Updated: ${existingRoutine.updated_at})` : 'Not found'}`);
