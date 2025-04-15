@@ -400,7 +400,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   for (let i = 0; i < supersetPairs; i++) {
     const strength = validExercises[i];
     const abs = validAbsExercises[i];
-    const supersetId = `superset-${Date.now()}-${i}`;
+    const supersetId = Date.now() + i;
 
     const strengthNote = `Superset with: ${abs.title}`;
     const absNote = `Superset with: ${strength.title}`;
