@@ -394,13 +394,13 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     exercises: []
   };
 
-  const allSupersets = [];
-  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 2); // limit to 2 supersets (4 exercises total)
+  const allExercises = [];
+  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 2); // max 2 supersets
 
   for (let i = 0; i < supersetPairs; i++) {
     const strength = validExercises[i];
     const abs = validAbsExercises[i];
-    const supersetId = Date.now() + i;
+    const supersetId = i; // must be a number starting from 0
 
     const strengthNote = `Superset with: ${abs.title}`;
     const absNote = `Superset with: ${strength.title}`;
@@ -431,7 +431,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
       { type: 'normal', reps: 10, weight_kg: absWeight, duration_seconds: null, distance_meters: null, custom_metric: null }
     ];
 
-    allSupersets.push(
+    allExercises.push(
       {
         exercise_template_id: strength.id,
         superset_id: supersetId,
@@ -449,14 +449,13 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     );
   }
 
-  routinePayload.exercises = allSupersets;
-  // ✅ Safety cap: max 6 exercises (can remove later)
+  routinePayload.exercises = allExercises;
+
   if (routinePayload.exercises.length > 6) {
     console.warn("⚠️ Trimming routine to 6 exercises to prevent server error.");
     routinePayload.exercises = routinePayload.exercises.slice(0, 6);
   }
 
-  // 🧪 Debug
   const payloadTest = { routine: routinePayload };
   console.log("📦 Payload length:", JSON.stringify(payloadTest).length, "chars");
   console.log("📦 Exercise summary:", routinePayload.exercises.map(e => ({
@@ -468,6 +467,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   return routinePayload;
 }
+
 
 
 
