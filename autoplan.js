@@ -1,3 +1,6 @@
+const COACH_GPT_VERSION = 'v1.4 – Weekly Split + Recovery + Supersets + Variety';
+console.log(`🏷️ CoachGPT Version: ${COACH_GPT_VERSION}`);
+
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');

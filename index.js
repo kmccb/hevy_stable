@@ -1,3 +1,7 @@
+const COACH_GPT_VERSION = 'v1.4 – Weekly Split + Recovery + Supersets + Variety';
+console.log(`🏷️ CoachGPT Version: ${COACH_GPT_VERSION}`);
+
+
 // 1. MODULE IMPORTS
 const express = require("express"); // Web server framework
 const axios = require("axios"); // For making HTTP requests (e.g., to Hevy API)
