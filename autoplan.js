@@ -390,71 +390,96 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   const routinePayload = {
     title: `CoachGPT – ${workoutType} + Abs`,
-    notes: "Focus on form over weight. Supersets today! 💥",
+    notes: "Focus on form over weight. Supersets + strength finishers! 💥",
     exercises: []
   };
 
   const allExercises = [];
-  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 2); // max 2 supersets
+  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 2);
 
+  // 🔁 Build up to 2 supersets
   for (let i = 0; i < supersetPairs; i++) {
     const strength = validExercises[i];
     const abs = validAbsExercises[i];
-    const supersetId = i; // must be a number starting from 0
-
-    const strengthNote = `Superset with: ${abs.title}`;
-    const absNote = `Superset with: ${strength.title}`;
-
-    const strengthDuration = isDurationBased(strength);
-    const absDuration = isDurationBased(abs);
+    const supersetId = i;
 
     const strengthWeight = findSimilarExerciseWeight(strength, historyAnalysis.progressionAnalysis);
     const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
 
-    const strengthSets = strengthDuration ? [
-      { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null }
-    ] : [
-      { type: 'normal', reps: 8, weight_kg: strengthWeight, duration_seconds: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', reps: 8, weight_kg: strengthWeight, duration_seconds: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', reps: 8, weight_kg: strengthWeight, duration_seconds: null, distance_meters: null, custom_metric: null }
-    ];
+    const strengthSets = isDurationBased(strength) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null }) :
+      Array(3).fill({ type: 'normal', reps: 8, weight_kg: strengthWeight });
 
-    const absSets = absDuration ? [
-      { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null }
-    ] : [
-      { type: 'normal', reps: 10, weight_kg: absWeight, duration_seconds: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', reps: 10, weight_kg: absWeight, duration_seconds: null, distance_meters: null, custom_metric: null },
-      { type: 'normal', reps: 10, weight_kg: absWeight, duration_seconds: null, distance_meters: null, custom_metric: null }
-    ];
+    const absSets = isDurationBased(abs) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null }) :
+      Array(3).fill({ type: 'normal', reps: 10, weight_kg: absWeight });
 
     allExercises.push(
       {
         exercise_template_id: strength.id,
         superset_id: supersetId,
         rest_seconds: 30,
-        notes: strengthNote,
+        notes: `Superset with: ${abs.title}`,
         sets: strengthSets
       },
       {
         exercise_template_id: abs.id,
         superset_id: supersetId,
         rest_seconds: 30,
-        notes: absNote,
+        notes: `Superset with: ${strength.title}`,
         sets: absSets
       }
     );
   }
 
-  routinePayload.exercises = allExercises;
+  // 💪 Add up to 2 more solo strength exercises
+  const usedStrengthIds = new Set(allExercises.map(e => e.exercise_template_id));
+  const extraStrengths = validExercises
+    .filter(ex => !usedStrengthIds.has(ex.id))
+    .slice(0, 2);
 
-  if (routinePayload.exercises.length > 6) {
-    console.warn("⚠️ Trimming routine to 6 exercises to prevent server error.");
-    routinePayload.exercises = routinePayload.exercises.slice(0, 6);
+  for (const extra of extraStrengths) {
+    const weight = findSimilarExerciseWeight(extra, historyAnalysis.progressionAnalysis);
+    const sets = isDurationBased(extra) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null }) :
+      Array(3).fill({ type: 'normal', reps: 8, weight_kg: weight });
+
+    allExercises.push({
+      exercise_template_id: extra.id,
+      superset_id: null,
+      rest_seconds: 90,
+      notes: "Finisher – go all in 💪",
+      sets: sets
+    });
   }
+
+  // 🔁 Optional Abs finisher if we’ve used < 3 total abs
+  const currentAbsCount = allExercises.filter(e => {
+    const t = exerciseTemplates.find(t => t.id === e.exercise_template_id);
+    return t?.primary_muscle_group?.toLowerCase().includes("abdominal") || t?.primary_muscle_group?.toLowerCase().includes("oblique");
+  }).length;
+
+  if (currentAbsCount < 3 && validAbsExercises.length > supersetPairs) {
+    const extraAbs = validAbsExercises.find(ex => !usedStrengthIds.has(ex.id));
+    if (extraAbs) {
+      const weight = findSimilarExerciseWeight(extraAbs, historyAnalysis.progressionAnalysis);
+      const sets = isDurationBased(extraAbs) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null }) :
+        Array(3).fill({ type: 'normal', reps: 10, weight_kg: weight });
+
+      allExercises.push({
+        exercise_template_id: extraAbs.id,
+        superset_id: null,
+        rest_seconds: 60,
+        notes: "Abs finisher – controlled reps",
+        sets: sets
+      });
+    }
+  }
+
+  // ✂️ Optional: Cap total exercises for safety
+  if (allExercises.length > 6) {
+    console.warn("⚠️ Trimming routine to 6 exercises.");
+    allExercises.length = 6;
+  }
+
+  routinePayload.exercises = allExercises;
 
   const payloadTest = { routine: routinePayload };
   console.log("📦 Payload length:", JSON.stringify(payloadTest).length, "chars");
@@ -467,6 +492,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   return routinePayload;
 }
+
 
 
 
