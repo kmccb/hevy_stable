@@ -171,7 +171,7 @@ function analyzeHistory(workouts) {
   };
 }
 
-function determineWorkoutType(historyAnalysis, lastCompletedWorkout) {
+function determineWorkoutType(historyAnalysis, lastCompletedWorkout, allWorkouts = []) {
   const lastScheduled = readLastScheduled();
   const today = new Date();
   const lastScheduledDate = lastScheduled.date ? new Date(lastScheduled.date) : null;
@@ -186,24 +186,53 @@ function determineWorkoutType(historyAnalysis, lastCompletedWorkout) {
     }
   }
 
-  const muscleFrequencies = historyAnalysis.muscleGroupFrequency;
-  const muscleGroups = Object.keys(muscleFrequencies);
-
-  const undertrainedMuscles = muscleGroups
-    .filter(m => !m.includes('abdominals') && !m.includes('obliques') && m !== 'cardio')
-    .sort((a, b) => muscleFrequencies[a] - muscleFrequencies[b]);
-
-  if (undertrainedMuscles.length === 0) {
-    console.log('⚠️ No muscle groups to train (history might be empty). Defaulting to Push.');
-    return 'Push';
+  // 🧠 New logic: track last 3 workout splits
+  const recentSplits = [];
+  for (const workout of allWorkouts.slice(0, 3)) {
+    const splitsSeen = new Set();
+    for (const exercise of workout.exercises) {
+      const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
+      if (!template) continue;
+      const muscle = template.primary_muscle_group?.toLowerCase();
+      const split = muscleToWorkoutType[muscle];
+      if (split && !splitsSeen.has(split)) {
+        recentSplits.push(split);
+        splitsSeen.add(split);
+      }
+    }
   }
 
-  const leastTrainedMuscle = undertrainedMuscles[0];
-  const workoutType = muscleToWorkoutType[leastTrainedMuscle] || 'Push';
-  console.log(`📅 Determined workout type: ${workoutType} (least trained muscle: ${leastTrainedMuscle}, frequency: ${muscleFrequencies[leastTrainedMuscle]})`);
+  const lastSplit = recentSplits[0];
+  const recentSplitCounts = recentSplits.reduce((counts, split) => {
+    counts[split] = (counts[split] || 0) + 1;
+    return counts;
+  }, {});
 
-  return workoutType;
+  // 🔍 Sort by least-trained
+  const muscleFrequencies = historyAnalysis.muscleGroupFrequency;
+  const splitScores = Object.entries(muscleTargets).map(([split, muscles]) => {
+    const totalFreq = muscles.reduce((sum, m) => sum + (muscleFrequencies[m.toLowerCase()] || 0), 0);
+    return { split, frequency: totalFreq, recentCount: recentSplitCounts[split] || 0 };
+  });
+
+  // ❌ Avoid same split as yesterday unless everything is recent
+  const avoidSplit = lastSplit;
+
+  const preferred = splitScores
+    .filter(s => s.split !== avoidSplit)
+    .sort((a, b) => a.frequency - b.frequency || a.recentCount - b.recentCount);
+
+  if (preferred.length > 0) {
+    console.log(`📅 Smart-rotated workout: ${preferred[0].split} (avoiding repeat of ${avoidSplit})`);
+    return preferred[0].split;
+  }
+
+  // 🛑 Fallback
+  const fallback = splitScores.sort((a, b) => a.frequency - b.frequency)[0]?.split || 'Push';
+  console.log(`📅 All splits recent. Fallback to: ${fallback}`);
+  return fallback;
 }
+
 
 function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysis, numExercises = 4) {
   const usedTitles = new Set();
@@ -442,20 +471,27 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   return routinePayload;
 }
 
+
 async function createRoutine(workoutType, exercises, absExercises) {
   const routinePayload = buildRoutinePayload(workoutType, exercises, absExercises);
 
-  console.log(`🔍 First exercise in payload: ${routinePayload.exercises[0]?.exercise_template_id} (Title: ${exercises[0]?.title || absExercises[0]?.title})`);
-
+  // 🔒 Prevent undefined folder_id errors
+  delete routinePayload.routine_folder_id;
+  delete routinePayload.folder_id;
+  
   const payload = {
     routine: routinePayload
   };
+  
+  // ✅ Log final payload
+  // console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));
+  
 
-  //console.log('📤 Routine payload (create):', JSON.stringify(payload, null, 2));
+  // console.log('📤 Routine payload (create):', JSON.stringify(payload, null, 2));
 
   try {
-    const response = await makeApiRequestWithRetry('post', `${BASE_URL}/v1/routines`, payload, headers);
-    //console.log('📥 Routine API response (create):', JSON.stringify(response.data, null, 2));
+    const response = await makeApiRequestWithRetry('post', `${BASE_URL}/routines`, payload, headers);
+    console.log('📥 Routine API response (create):', JSON.stringify(response.data, null, 2));
     const routineTitle = response.data?.routine?.title || response.data?.title || routinePayload.title;
     console.log(`Routine created: ${routineTitle}`);
     return response.data;
@@ -466,7 +502,7 @@ async function createRoutine(workoutType, exercises, absExercises) {
 }
 
 async function validateRoutineId(routineId) {
-  console.warn(`⚠️ Skipping validation for routine ID ${routineId}. GET /v1/routines/{id} not supported.`);
+ // console.warn(`⚠️ Skipping validation for routine ID ${routineId}. GET /v1/routines/{id} not supported.`);
   return true;
 }
 
@@ -527,7 +563,22 @@ async function refreshRoutines() {
 
     console.log(`🔍 Total routines retrieved: ${allRoutines.length}`);
 
-   if (allRoutines.length !== validRoutines.length) {
+    // Validate each routine ID before saving to the cache file
+    const validRoutines = [];
+    for (const routine of allRoutines) {
+      if (routine.id && routine.title && typeof routine.title === 'string') {
+        const isValid = await validateRoutineId(routine.id);
+        if (isValid) {
+          validRoutines.push(routine);
+        } else {
+   //       console.warn(`⚠️ Skipping routine with invalid ID: ${routine.id} (Title: ${routine.title})`);
+        }
+      } else {
+   //     console.warn(`⚠️ Skipping invalid routine (missing ID or title):`, JSON.stringify(routine));
+      }
+    }
+
+    if (allRoutines.length !== validRoutines.length) {
       console.warn(`⚠️ Filtered out ${allRoutines.length - validRoutines.length} invalid routines`);
     }
 
@@ -545,7 +596,7 @@ async function autoplan({ workouts, templates, routines }) {
     exerciseTemplates = templates.filter(t => !excludedExercises.has(t.title));
     historyAnalysis = analyzeHistory(workouts);
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
-    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout);
+    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout, workouts);
     const today = new Date();
     writeLastScheduled(workoutType, today);
 
@@ -583,6 +634,9 @@ async function autoplan({ workouts, templates, routines }) {
       console.warn('⚠️ No routines available after all fallbacks. Proceeding to create a new routine.');
       updatedRoutines = [];
     }
+
+    console.log("🔍 Checking for existing CoachGPT routine. Titles found:");
+updatedRoutines.forEach(r => console.log(`– ${r.title}`));
 
     let existingRoutine = updatedRoutines.find(r => r.title && typeof r.title === 'string' && r.title.includes('CoachGPT'));
     console.log(`🔍 Existing CoachGPT routine: ${existingRoutine ? `Found (ID: ${existingRoutine.id}, Title: ${existingRoutine.title}, Updated: ${existingRoutine.updated_at})` : 'Not found'}`);
