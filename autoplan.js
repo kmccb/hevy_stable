@@ -455,7 +455,7 @@ async function createRoutine(workoutType, exercises, absExercises) {
   };
   
   // ✅ Log final payload
-  console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));
+  // console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));
   
 
   // console.log('📤 Routine payload (create):', JSON.stringify(payload, null, 2));
