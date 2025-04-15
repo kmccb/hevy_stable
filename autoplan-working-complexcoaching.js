@@ -354,122 +354,147 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   }
 
   const findSimilarExerciseWeight = (exercise, progressionAnalysis) => {
-    if (progressionAnalysis[exercise.title]) {
-      const progression = progressionAnalysis[exercise.title];
-      if (progression.suggestion.includes("Increase weight to")) {
-        const suggestedWeightLbs = parseFloat(progression.suggestion.match(/Increase weight to (\d+\.\d+)/)[1]);
-        return suggestedWeightLbs / KG_TO_LBS;
-      }
-      return parseFloat(progression.lastWeightLbs) / KG_TO_LBS;
+    const progression = progressionAnalysis[exercise.title];
+    if (progression?.suggestion.includes("Increase weight to")) {
+      return parseFloat(progression.suggestion.match(/Increase weight to (\d+\.\d+)/)[1]) / KG_TO_LBS;
     }
+    if (progression) return parseFloat(progression.lastWeightLbs) / KG_TO_LBS;
 
     const primaryMuscle = exercise.primary_muscle_group?.toLowerCase();
     const equipment = exercise.equipment?.toLowerCase();
-    for (const [title, progression] of Object.entries(progressionAnalysis)) {
+    for (const [title, p] of Object.entries(historyAnalysis.progressionAnalysis)) {
       const template = exerciseTemplates.find(t => t.title === title);
       if (template &&
           template.primary_muscle_group?.toLowerCase() === primaryMuscle &&
           template.equipment?.toLowerCase() === equipment) {
-        console.log(`🔄 Using weight from similar exercise ${title} for ${exercise.title}`);
-        if (progression.suggestion.includes("Increase weight to")) {
-          const suggestedWeightLbs = parseFloat(progression.suggestion.match(/Increase weight to (\d+\.\d+)/)[1]);
-          return suggestedWeightLbs / KG_TO_LBS;
+        if (p.suggestion.includes("Increase weight to")) {
+          return parseFloat(p.suggestion.match(/Increase weight to (\d+\.\d+)/)[1]) / KG_TO_LBS;
         }
-        return parseFloat(progression.lastWeightLbs) / KG_TO_LBS;
+        return parseFloat(p.lastWeightLbs) / KG_TO_LBS;
       }
     }
-    if (equipment === 'resistance_band') {
-      return 10;
-    }
-    if (equipment === 'dumbbell') {
-      return 5; // Default starting weight of 5 kg (11 lbs) for dumbbell exercises
-    }
+    if (equipment === 'resistance_band') return 10;
+    if (equipment === 'dumbbell') return 5;
     return 0;
   };
 
   const isDurationBased = ex => {
     const titleLower = ex.title.toLowerCase();
-    const isAbsExercise = ex.primary_muscle_group?.toLowerCase().includes('abdominals') || 
-                         ex.primary_muscle_group?.toLowerCase().includes('obliques');
+    const isAbs = ex.primary_muscle_group?.toLowerCase().includes('abdominals') ||
+                  ex.primary_muscle_group?.toLowerCase().includes('obliques');
     const isBodyweight = !ex.equipment || ex.equipment.toLowerCase() === 'none';
-
-    const durationKeywords = [
-      'plank', 'hold', 'dead bug', 'side bridge', 'wall sit', 
-      'hanging', 'isometric', 'static', 'bridge', 'superman', 'bird dog'
-    ];
-    const hasDurationKeyword = durationKeywords.some(keyword => titleLower.includes(keyword));
-
-    const isLikelyDurationBased = isAbsExercise && isBodyweight && 
-                                 !titleLower.includes('crunch') && !titleLower.includes('twist');
-
-    return hasDurationKeyword || isLikelyDurationBased;
+    const durationKeywords = ['plank', 'hold', 'dead bug', 'side bridge', 'wall sit', 'hanging', 'isometric', 'static', 'bridge', 'superman', 'bird dog'];
+    return durationKeywords.some(k => titleLower.includes(k)) ||
+           (isAbs && isBodyweight && !titleLower.includes('crunch') && !titleLower.includes('twist'));
   };
 
   const routinePayload = {
     title: `CoachGPT – ${workoutType} + Abs`,
-    notes: "Focus on form over weight. Remember to stretch after.",
-    exercises: [
-      ...validExercises.map(ex => {
-        const durationBased = isDurationBased(ex);
-        const isBodyweight = !ex.equipment || ex.equipment === 'none';
-        const weight_kg = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
-        const progression = historyAnalysis.progressionAnalysis[ex.title];
-        const note = progression
-          ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
-          : (weight_kg > 0 ? `Start with ${Math.round(weight_kg * KG_TO_LBS)} lbs${ex.equipment === 'resistance_band' ? ' (equivalent for resistance band)' : ' (based on similar exercise)'}` : (isBodyweight ? "Bodyweight exercise" : "Start moderate and build"));
-        const sets = durationBased ? [
-          { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null }
-        ] : [
-          { type: 'normal', reps: 8, weight_kg: weight_kg, duration_seconds: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', reps: 8, weight_kg: weight_kg, duration_seconds: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', reps: 8, weight_kg: weight_kg, duration_seconds: null, distance_meters: null, custom_metric: null }
-        ];
-        //console.log(`🏋️‍♂️ Main exercise: ${ex.title} (Duration-based: ${durationBased}, Muscle: ${ex.primary_muscle_group}, Equipment: ${ex.equipment}, Sets: ${JSON.stringify(sets)})`);
-        return {
-          exercise_template_id: ex.id,
-          superset_id: null,
-          rest_seconds: durationBased ? 60 : 90,
-          notes: note,
-          sets: sets
-        };
-      }),
-      ...validAbsExercises.map(ex => {
-        const durationBased = isDurationBased(ex);
-        const isWeighted = ex.title.toLowerCase().includes('weighted') || ex.title.toLowerCase().includes('cable');
-        const weight_kg = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
-        let finalWeightKg = weight_kg;
-        if (isWeighted && weight_kg === 0) {
-          finalWeightKg = 5;
-        }
-        const progression = historyAnalysis.progressionAnalysis[ex.title];
-        const note = progression
-          ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
-          : (finalWeightKg > 0 ? `Start with ${Math.round(finalWeightKg * KG_TO_LBS)} lbs` : "Focus on slow, controlled reps");
-        const sets = durationBased ? [
-          { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', duration_seconds: 45, weight_kg: 0, reps: null, distance_meters: null, custom_metric: null }
-        ] : [
-          { type: 'normal', reps: 10, weight_kg: finalWeightKg, duration_seconds: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', reps: 10, weight_kg: finalWeightKg, duration_seconds: null, distance_meters: null, custom_metric: null },
-          { type: 'normal', reps: 10, weight_kg: finalWeightKg, duration_seconds: null, distance_meters: null, custom_metric: null }
-        ];
-        //console.log(`🏋️‍♂️ Abs exercise: ${ex.title} (Duration-based: ${durationBased}, Muscle: ${ex.primary_muscle_group}, Equipment: ${ex.equipment}, Sets: ${JSON.stringify(sets)})`);
-        return {
-          exercise_template_id: ex.id,
-          superset_id: null,
-          rest_seconds: 60,
-          notes: note,
-          sets: sets
-        };
-      })
-    ]
+    notes: "Focus on form over weight. Supersets + finishers for max impact. 💥",
+    exercises: []
   };
+
+  const allExercises = [];
+  const usedExerciseIds = new Set();
+
+  // 🔁 Supersets
+  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 2);
+  for (let i = 0; i < supersetPairs; i++) {
+    const strength = validExercises[i];
+    const abs = validAbsExercises[i];
+    const supersetId = i;
+
+    const strengthWeight = findSimilarExerciseWeight(strength, historyAnalysis.progressionAnalysis);
+    const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
+
+    const strengthSets = isDurationBased(strength) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
+      Array(3).fill({ type: 'normal', reps: 8, weight_kg: strengthWeight });
+
+    const absSets = isDurationBased(abs) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
+      Array(3).fill({ type: 'normal', reps: 10, weight_kg: absWeight });
+
+    allExercises.push(
+      {
+        exercise_template_id: strength.id,
+        superset_id: supersetId,
+        rest_seconds: 30,
+        notes: `Superset with: ${abs.title}`,
+        sets: strengthSets
+      },
+      {
+        exercise_template_id: abs.id,
+        superset_id: supersetId,
+        rest_seconds: 30,
+        notes: `Superset with: ${strength.title}`,
+        sets: absSets
+      }
+    );
+
+    usedExerciseIds.add(strength.id);
+    usedExerciseIds.add(abs.id);
+  }
+
+  // 💪 Add up to 3 solo strength finishers
+  const remainingStrengths = validExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 3);
+  for (const ex of remainingStrengths) {
+    const weight = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
+    const sets = isDurationBased(ex) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
+      Array(3).fill({ type: 'normal', reps: 8, weight_kg: weight });
+
+    allExercises.push({
+      exercise_template_id: ex.id,
+      superset_id: null,
+      rest_seconds: 90,
+      notes: "Finisher – go all in 💪",
+      sets
+    });
+
+    usedExerciseIds.add(ex.id);
+    if (allExercises.length >= 7) break;
+  }
+
+  // 🔥 Abs finisher if room
+  const remainingAbs = validAbsExercises.filter(ex => !usedExerciseIds.has(ex.id));
+  if (allExercises.length < 8 && remainingAbs.length > 0) {
+    const abs = remainingAbs[0];
+    const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
+    const sets = isDurationBased(abs) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
+      Array(3).fill({ type: 'normal', reps: 10, weight_kg: absWeight });
+
+    allExercises.push({
+      exercise_template_id: abs.id,
+      superset_id: null,
+      rest_seconds: 60,
+      notes: "Abs finisher – controlled reps",
+      sets
+    });
+
+    usedExerciseIds.add(abs.id);
+  }
+
+  // ✂️ Cap at 8 total exercises
+  if (allExercises.length > 8) {
+    allExercises.length = 8;
+    console.warn("⚠️ Routine trimmed to 8 exercises.");
+  }
+
+  routinePayload.exercises = allExercises;
+
+  const payloadTest = { routine: routinePayload };
+  console.log("📦 Payload length:", JSON.stringify(payloadTest).length, "chars");
+  console.log("📦 Exercise summary:", routinePayload.exercises.map(e => ({
+    template_id: e.exercise_template_id,
+    superset: e.superset_id,
+    sets: e.sets.length,
+    rest: e.rest_seconds
+  })));
 
   return routinePayload;
 }
+
+
+
+
 
 
 async function createRoutine(workoutType, exercises, absExercises) {
@@ -479,9 +504,19 @@ async function createRoutine(workoutType, exercises, absExercises) {
   delete routinePayload.routine_folder_id;
   delete routinePayload.folder_id;
   
-  const payload = {
-    routine: routinePayload
-  };
+// 🧪 Debug payload size and structure
+const payloadTest = {
+  routine: routinePayload
+};
+
+console.log("📦 Payload length:", JSON.stringify(payloadTest).length, "chars");
+console.log("📦 Exercise summary:", routinePayload.exercises.map(e => ({
+  template_id: e.exercise_template_id,
+  superset: e.superset_id,
+  sets: e.sets.length,
+  rest: e.rest_seconds
+})));
+
   
   // ✅ Log final payload
   // console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));

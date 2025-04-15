@@ -1,6 +1,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const getNextSplit = require('./getNextSplit');
 require('dotenv').config();
 
 const API_KEY = process.env.HEVY_API_KEY;
@@ -631,7 +632,8 @@ async function autoplan({ workouts, templates, routines }) {
     exerciseTemplates = templates.filter(t => !excludedExercises.has(t.title));
     historyAnalysis = analyzeHistory(workouts);
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
-    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout, workouts);
+    const workoutType = getNextSplit();
+
     const today = new Date();
     writeLastScheduled(workoutType, today);
 
