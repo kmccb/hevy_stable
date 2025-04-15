@@ -13,10 +13,11 @@ const muscleTargets = {
   Push: ['Chest', 'Shoulders', 'Triceps'],
   Pull: ['Lats', 'Upper Back', 'Biceps'],
   Legs: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
-  Core: ['Abdominals', 'Obliques'], // ✅ Added
+  Core: ['Abdominals', 'Obliques', 'Full Body', 'Lower Back'], // ✅ Expand core target pool
   Cardio: ['Cardio'],
   Abs: ['Abdominals', 'Obliques']
 };
+
 
 
 const muscleToWorkoutType = {
