@@ -171,7 +171,7 @@ function analyzeHistory(workouts) {
   };
 }
 
-function determineWorkoutType(historyAnalysis, lastCompletedWorkout) {
+function determineWorkoutType(historyAnalysis, lastCompletedWorkout, allWorkouts = []) {
   const lastScheduled = readLastScheduled();
   const today = new Date();
   const lastScheduledDate = lastScheduled.date ? new Date(lastScheduled.date) : null;
@@ -186,24 +186,53 @@ function determineWorkoutType(historyAnalysis, lastCompletedWorkout) {
     }
   }
 
-  const muscleFrequencies = historyAnalysis.muscleGroupFrequency;
-  const muscleGroups = Object.keys(muscleFrequencies);
-
-  const undertrainedMuscles = muscleGroups
-    .filter(m => !m.includes('abdominals') && !m.includes('obliques') && m !== 'cardio')
-    .sort((a, b) => muscleFrequencies[a] - muscleFrequencies[b]);
-
-  if (undertrainedMuscles.length === 0) {
-    console.log('⚠️ No muscle groups to train (history might be empty). Defaulting to Push.');
-    return 'Push';
+  // 🧠 New logic: track last 3 workout splits
+  const recentSplits = [];
+  for (const workout of allWorkouts.slice(0, 3)) {
+    const splitsSeen = new Set();
+    for (const exercise of workout.exercises) {
+      const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
+      if (!template) continue;
+      const muscle = template.primary_muscle_group?.toLowerCase();
+      const split = muscleToWorkoutType[muscle];
+      if (split && !splitsSeen.has(split)) {
+        recentSplits.push(split);
+        splitsSeen.add(split);
+      }
+    }
   }
 
-  const leastTrainedMuscle = undertrainedMuscles[0];
-  const workoutType = muscleToWorkoutType[leastTrainedMuscle] || 'Push';
-  console.log(`📅 Determined workout type: ${workoutType} (least trained muscle: ${leastTrainedMuscle}, frequency: ${muscleFrequencies[leastTrainedMuscle]})`);
+  const lastSplit = recentSplits[0];
+  const recentSplitCounts = recentSplits.reduce((counts, split) => {
+    counts[split] = (counts[split] || 0) + 1;
+    return counts;
+  }, {});
 
-  return workoutType;
+  // 🔍 Sort by least-trained
+  const muscleFrequencies = historyAnalysis.muscleGroupFrequency;
+  const splitScores = Object.entries(muscleTargets).map(([split, muscles]) => {
+    const totalFreq = muscles.reduce((sum, m) => sum + (muscleFrequencies[m.toLowerCase()] || 0), 0);
+    return { split, frequency: totalFreq, recentCount: recentSplitCounts[split] || 0 };
+  });
+
+  // ❌ Avoid same split as yesterday unless everything is recent
+  const avoidSplit = lastSplit;
+
+  const preferred = splitScores
+    .filter(s => s.split !== avoidSplit)
+    .sort((a, b) => a.frequency - b.frequency || a.recentCount - b.recentCount);
+
+  if (preferred.length > 0) {
+    console.log(`📅 Smart-rotated workout: ${preferred[0].split} (avoiding repeat of ${avoidSplit})`);
+    return preferred[0].split;
+  }
+
+  // 🛑 Fallback
+  const fallback = splitScores.sort((a, b) => a.frequency - b.frequency)[0]?.split || 'Push';
+  console.log(`📅 All splits recent. Fallback to: ${fallback}`);
+  return fallback;
 }
+
 
 function pickExercises(templates, muscleGroups, recentTitles, progressionAnalysis, numExercises = 4) {
   const usedTitles = new Set();
@@ -567,7 +596,7 @@ async function autoplan({ workouts, templates, routines }) {
     exerciseTemplates = templates.filter(t => !excludedExercises.has(t.title));
     historyAnalysis = analyzeHistory(workouts);
     const lastCompletedWorkout = workouts.length > 0 ? workouts[0] : null;
-    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout);
+    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout, workouts);
     const today = new Date();
     writeLastScheduled(workoutType, today);
 
