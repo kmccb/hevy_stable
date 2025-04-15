@@ -13,9 +13,11 @@ const muscleTargets = {
   Push: ['Chest', 'Shoulders', 'Triceps'],
   Pull: ['Lats', 'Upper Back', 'Biceps'],
   Legs: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  Core: ['Abdominals', 'Obliques'], // ✅ Added
   Cardio: ['Cardio'],
   Abs: ['Abdominals', 'Obliques']
 };
+
 
 const muscleToWorkoutType = {
   chest: 'Push',
