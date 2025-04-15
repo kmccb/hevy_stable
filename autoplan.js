@@ -450,6 +450,10 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   }
 
   routinePayload.exercises = allSupersets;
+  // ✅ Safety cap: max 6 exercises (can remove later)
+if (routinePayload.exercises.length > 6) {
+  console.warn("⚠️ Trimming routine to 6 exercises to prevent server error.");
+  routinePayload.exercises = routinePayload.exercises.slice(0, 6);
   return routinePayload;
 }
 
@@ -462,9 +466,19 @@ async function createRoutine(workoutType, exercises, absExercises) {
   delete routinePayload.routine_folder_id;
   delete routinePayload.folder_id;
   
-  const payload = {
-    routine: routinePayload
-  };
+// 🧪 Debug payload size and structure
+const payloadTest = {
+  routine: routinePayload
+};
+
+console.log("📦 Payload length:", JSON.stringify(payloadTest).length, "chars");
+console.log("📦 Exercise summary:", routinePayload.exercises.map(e => ({
+  template_id: e.exercise_template_id,
+  superset: e.superset_id,
+  sets: e.sets.length,
+  rest: e.rest_seconds
+})));
+
   
   // ✅ Log final payload
   // console.log("📤 FINAL routine payload being sent to POST:", JSON.stringify(payload, null, 2));
