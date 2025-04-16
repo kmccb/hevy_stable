@@ -18,15 +18,7 @@ const { sanitizeRoutine } = require("./trainerUtils");
 const { getQuoteOfTheDay } = require("./quoteUtils");
 const fetchEveryWorkout = require('./fetchEveryWorkout');
 
-app.get('/fetch-all-history', async (req, res) => {
-  try {
-    await fetchEveryWorkout();
-    res.send('✅ Full workout history fetched and saved.');
-  } catch (err) {
-    console.error('❌ Failed to fetch history:', err.message);
-    res.status(500).send('Failed to fetch workout history.');
-  }
-});
+
 
 
 // 2. CONSTANTS AND CONFIGURATION
@@ -38,6 +30,15 @@ const HEVY_API_BASE = "https://api.hevyapp.com/v1"; // Base URL for Hevy API
 const EMAIL_USER = "tomscott2340@gmail.com"; // Email address for sending reports
 const EMAIL_PASS = process.env.EMAIL_PASS; // Email password (stored in environment variables)
 const KG_TO_LBS = 2.20462; // Conversion factor from kilograms to pounds
+app.get('/fetch-all-history', async (req, res) => {
+  try {
+    await fetchEveryWorkout();
+    res.send('✅ Full workout history fetched and saved.');
+  } catch (err) {
+    console.error('❌ Failed to fetch history:', err.message);
+    res.status(500).send('Failed to fetch workout history.');
+  }
+});
 
 // Startup Cache Loader Section
 const cacheFiles = {
