@@ -542,6 +542,20 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     console.warn("⚠️ Routine trimmed to 8 exercises.");
   }
 
+  // ✅ Final deduplication pass to prevent duplicates slipping through
+const deduped = [];
+const seenIds = new Set();
+for (const ex of allExercises) {
+  if (!seenIds.has(ex.exercise_template_id)) {
+    deduped.push(ex);
+    seenIds.add(ex.exercise_template_id);
+  } else {
+    console.warn(`⚠️ Duplicate detected and removed: ${ex.exercise_template_id}`);
+  }
+}
+routinePayload.exercises = deduped;
+
+
   routinePayload.exercises = allExercises;
 
   const payloadTest = { routine: routinePayload };
