@@ -59,6 +59,20 @@ function estimateCalories(macros) {
   return providedCalories < 500 && estimatedCalories > 500 ? estimatedCalories : providedCalories;
 }
 
+/**
+ * Formats a date string to MM-DD-YYYY format.
+ * @param {string|Date} date - The date to format.
+ * @returns {string} - Formatted date or 'N/A' if invalid.
+ */
+function formatDate(date) {
+  try {
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  } catch (e) {
+    return 'N/A';
+  }
+}
+
 function generateHtmlSummary(
   workouts,
   macros,
@@ -70,7 +84,7 @@ function generateHtmlSummary(
   quoteText
 ) {
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
-  const userName = process.env.EMAIL_USER || 'there'; // Fallback to generic if not set
+  const userName = process.env.EMAIL_USER || 'there';
 
   // Calculate weight change for a personal touch
   const weightChange = (() => {
@@ -119,7 +133,7 @@ function generateHtmlSummary(
     weight: macros.weight || 'N/A',
     steps: macros.steps || 'N/A'
   };
-  const yesterdayCalories = estimateCalories(macros); // For clarity
+  const yesterdayCalories = estimateCalories(macros);
 
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
@@ -129,7 +143,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
       ${workoutBlock}
 
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${macros.date || 'N/A'})</h3>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
         <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
