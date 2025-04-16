@@ -105,15 +105,15 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     if (isDuration && i.avgDuration) {
       const newDuration = i.avgDuration + 5;
       tip += `You held for ${i.avgDuration}s consistently—try ${newDuration}s next time to push your endurance, but only if form stays solid.`;
-    } else if (isBodyweight && i.avgReps && !isNaN(i.avgReps)) {
-      const newReps = i.avgReps + 2;
-      tip += `You averaged ${i.avgReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
-    } else if (i.avgReps && i.avgWeightLbs && !isNaN(i.avgReps) && !isNaN(i.avgWeightLbs)) {
-      const weightIncrease = Math.min(5, i.avgWeightLbs * 0.05); // 5% or 5 lbs max
-      const newWeight = Number.isFinite(i.avgWeightLbs) ? (i.avgWeightLbs + weightIncrease).toFixed(1) : i.avgWeightLbs;
-      const newReps = i.avgReps + 1;
-      const effort = i.avgReps >= 10 ? "manageable" : "challenging";
-      tip += `You lifted ${i.avgWeightLbs} lbs for ${i.avgReps} reps, which felt ${effort}—consider ${newWeight} lbs or ${newReps} reps next time if your form held up, but don’t rush—focus on control first.`;
+    } else if (isBodyweight && i.maxReps && !isNaN(i.maxReps)) {
+      const newReps = i.maxReps + 2;
+      tip += `You hit ${i.maxReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
+    } else if (i.maxReps && i.maxWeightLbs && !isNaN(i.maxReps) && !isNaN(i.maxWeightLbs)) {
+      const weightIncrease = Math.min(5, i.maxWeightLbs * 0.05); // 5% or 5 lbs max
+      const newWeight = Number.isFinite(i.maxWeightLbs) ? (i.maxWeightLbs + weightIncrease).toFixed(1) : i.maxWeightLbs;
+      const newReps = i.maxReps + 1;
+      const effort = i.maxReps >= 10 ? "manageable" : "challenging";
+      tip += `You lifted ${i.maxWeightLbs} lbs for ${i.maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
     } else {
       tip += `Your form’s solid—keep it consistent and we’ll add reps or weight when you’re ready.`;
     }
@@ -186,7 +186,7 @@ function generateHtmlSummary(
 
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
-      <h2 style="color: #2c3e50; font-size: 24px;">What up, Tom! Here's Your Daily Fitness Update</h2>
+      <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
       <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
