@@ -146,7 +146,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal </li>
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
