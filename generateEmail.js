@@ -79,7 +79,8 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
   ${summarizeWorkout('Routine', todaysWorkout)}
 
   <h3>🥗 Macros</h3>
-  <p>${macroInsights()}<br>Weight: ${weight} lbs | Steps: ${steps.toLocaleString()}</p>
+<p>${macroInsights()}<br>Weight: ${weight ?? '—'} lbs | Steps: ${(typeof steps === 'number' ? steps : 0).toLocaleString()}</p>
+
 
   <h3>📈 Long-Term Trends</h3>
   <ul>${longTerm || '<li>No trend data yet</li>'}</ul>
