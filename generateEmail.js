@@ -203,7 +203,7 @@ function generateHtmlSummary(
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
       <p>Check out these trends to see how far you've come:</p>
-      <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
+      <p><strong>Weight</strong>:${formatNumber(macroValues.weight)} Yesterday/p>
       <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
       <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
       <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
