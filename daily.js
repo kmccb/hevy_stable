@@ -1,4 +1,4 @@
-// daily.js – Rebuilt from scratch for CoachGPT v1.5
+// daily.js – Reconnected with Google Sheets
 const fs = require('fs');
 const path = require('path');
 const fetchRoutines = require('./fetchRoutines');
@@ -9,6 +9,7 @@ const analyzeLongTermTrends = require('./analyzeLongTermTrends');
 const autoplan = require('./autoplan');
 const sendEmail = require('./sendEmail');
 const generateEmail = require('./generateEmail');
+const { getMacrosFromSheet } = require('./sheetsService');
 
 async function runDailySync() {
   try {
@@ -30,16 +31,17 @@ async function runDailySync() {
     // Step 3: Load yesterday's workout if available
     const yesterdayWorkout = lastWorkout || { title: 'No workout found', exercises: [] };
 
-    // Step 4: Load macros/weight/steps from Google Sheet or dummy object (replace later)
+    // Step 4: Load macros/weight/steps from Google Sheet
+    const macroRow = await getMacrosFromSheet();
     const macros = {
-      date: new Date().toISOString().split('T')[0],
-      calories: 1442,
-      protein: 164,
-      carbs: 129,
-      fat: 58
+      date: macroRow?.date || new Date().toISOString().split("T")[0],
+      protein: Number(macroRow?.protein || 0),
+      fat: Number(macroRow?.fat || 0),
+      carbs: Number(macroRow?.carbs || 0),
+      calories: Number(macroRow?.calories || 0)
     };
-    const weight = 180;
-    const steps = 8200;
+    const weight = Number(macroRow?.weight || 0);
+    const steps = Number(macroRow?.steps || 0);
 
     // Step 5: Generate and send email
     const emailBody = generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout });
