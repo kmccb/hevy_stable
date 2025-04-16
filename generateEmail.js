@@ -64,7 +64,12 @@ Workout: ${yesterdayWorkout?.title || '—'}
 
 ${summarizeTrainerFeedback()}
 
-🥗 Macros – ${macros.date}
+if (!macros || typeof macros !== 'object') {
+  macros = { calories: 0, protein: 0, carbs: 0, fat: 0, date: '—' };
+}
+
+🥗 Macros – ${macros?.date || '—'}
+
 
 ${summarizeMacroFeedback()}
 
