@@ -14,16 +14,16 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
   };
 
   const summarizeTrainerFeedback = () => {
-    if (!yesterdayWorkout?.exercises?.length) return '• No exercises found in yesterday’s workout.';
+    if (!(yesterdayWorkout?.exercises?.length)) return '• No exercises found in yesterday’s workout.';
 
-    return yesterdayWorkout.exercises.map(ex => {
+    return (yesterdayWorkout.exercises || []).map(ex => {
       const title = ex.title;
       const t = trends[title];
       if (!t) return `• ${title}: ➡ Not enough data yet`;
 
       const maxWeight = t.maxWeight * 2.20462;
-      const avgVolume = average(t.volumeOverTime.map(v => v.volume));
-      const recentReps = average(t.repsOverTime.map(r => r.reps));
+      const avgVolume = average((t.volumeOverTime || []).map(v => v.volume));
+      const recentReps = average((t.repsOverTime || []).map(r => r.reps));
 
       return `• ${title}: 🏋 Max: ${maxWeight.toFixed(1)} lbs | Avg reps: ${recentReps.toFixed(1)} | Avg volume: ${avgVolume.toFixed(0)} → Keep pushing!`;
     }).join('\n');
@@ -38,7 +38,7 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
     return `${comment}\nCalories: ${kcal} kcal\nProtein: ${macros.protein}g\nCarbs: ${macros.carbs}g\nFat: ${macros.fat}g\nWeight: ${weight} lbs\nSteps: ${steps.toLocaleString()}`;
   };
 
-  const longTermHighlights = Object.entries(trends)
+  const longTermHighlights = Object.entries(trends || {})
     .filter(([_, data]) => data.totalSessions >= 3)
     .map(([title, data]) => {
       const weight = data.maxWeight * 2.20462;
@@ -48,7 +48,7 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
     .join('\n');
 
   const usedIds = new Set();
-  const workoutBreakdown = todaysWorkout
+  const workoutBreakdown = (todaysWorkout || [])
     .filter(ex => {
       if (usedIds.has(ex.exercise_template_id)) return false;
       usedIds.add(ex.exercise_template_id);
@@ -83,7 +83,7 @@ Keep it up — I’ve got your back.
 }
 
 function average(arr) {
-  const valid = arr.filter(v => typeof v === 'number' && !isNaN(v));
+  const valid = (arr || []).filter(v => typeof v === 'number' && !isNaN(v));
   return valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
 }
 
