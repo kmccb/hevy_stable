@@ -66,7 +66,8 @@ ${summarizeWorkout('Routine', todaysWorkout)}
 
 🥗 **Macros**
 ${macroInsights()}
-Weight: ${weight} lbs | Steps: ${steps.toLocaleString()}
+Weight: ${weight} lbs | Steps: ${(steps ?? 0).toLocaleString()}
+
 
 📈 **Long-Term Trends**
 ${longTerm || 'No trend data yet'}
