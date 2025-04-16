@@ -184,7 +184,7 @@ function generateHtmlSummary(
 
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
-      <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
+      <h2 style="color: #2c3e50; font-size: 24px;">What up, Tom! Here's Your Daily Fitness Update</h2>
       <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
@@ -193,7 +193,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal</li>
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
@@ -203,7 +203,7 @@ function generateHtmlSummary(
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
       <p>Check out these trends to see how far you've come:</p>
-      <p><strong>Weight</strong>:${formatNumber(macroValues.weight)} Yesterday/p>
+      <p><strong>Weight</strong>:${formatNumber(macroValues.weight)} lbs yesterday</p>
       <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
       <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
       <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
