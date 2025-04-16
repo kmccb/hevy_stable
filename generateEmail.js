@@ -26,7 +26,7 @@ function formatWorkoutForEmail(workout) {
       }
     }).join(", ");
 
-    return `<li><strong>${ex.title}</strong>: ${sets}</li>`;
+    return `<li><strong>${ex.title}</strong>: <span style="font-size: 14px;">${sets}</span></li>`;
   }).join("");
 
   return `
@@ -55,11 +55,7 @@ function estimateCalories(macros) {
   const carbs = parseFloat(macros.carbs) || 0;
   const fat = parseFloat(macros.fat) || 0;
   const providedCalories = parseFloat(macros.calories) || 0;
-
-  // Calculate estimated calories: protein and carbs (4 kcal/g), fat (9 kcal/g)
   const estimatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-
-  // If provided calories is suspiciously low (< 500 kcal) compared to estimate, use estimate
   return providedCalories < 500 && estimatedCalories > 500 ? estimatedCalories : providedCalories;
 }
 
@@ -74,6 +70,7 @@ function generateHtmlSummary(
   quoteText
 ) {
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
+  const userName = process.env.EMAIL_USER || 'there'; // Fallback to generic if not set
 
   // Calculate weight change for a personal touch
   const weightChange = (() => {
@@ -83,7 +80,7 @@ function generateHtmlSummary(
     if (validWeights.length < 2) return null;
     const delta = validWeights.at(-1) - validWeights[0];
     const direction = delta < 0 ? "dropped" : "gained";
-    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—nice work!`;
+    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—keep it up!`;
   })();
 
   // Format yesterday's workout with a friendly intro
@@ -113,7 +110,7 @@ function generateHtmlSummary(
       }).join("<br>")
     : "Looks like a rest day yesterday. Perfect time to recharge for what's next!";
 
-  // Handle missing macros data with N/A and estimate calories if needed
+  // Handle missing macros data with N/A and estimate calories
   const macroValues = {
     calories: estimateCalories(macros),
     protein: macros.protein || 'N/A',
@@ -122,10 +119,11 @@ function generateHtmlSummary(
     weight: macros.weight || 'N/A',
     steps: macros.steps || 'N/A'
   };
+  const yesterdayCalories = estimateCalories(macros); // For clarity
 
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
-      <h2 style="color: #2c3e50; font-size: 24px;">Hey there! Here's Your Daily Fitness Update</h2>
+      <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
       <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
@@ -134,7 +132,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${macros.date || 'N/A'})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal</li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
@@ -155,6 +153,7 @@ function generateHtmlSummary(
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
       <p>${feedback}</p>
+      <hr style="border: 1px solid #eee; margin: 20px 0;">
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Game Plan for Today (Day ${todayTargetDay})</h3>
       <p>Let’s keep the momentum going. Focus on:</p>
@@ -170,6 +169,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">A Little Inspiration</h3>
       <p style="font-style: italic; color: #555;">"${quoteText}"</p>
       <p style="font-size: 16px;">You’ve got this! Keep pushing, and I’m here cheering you on.</p>
+      <p style="font-size: 14px; color: #666;">Got feedback? Let me know: <a href="https://forms.gle/yourformlink">here</a></p>
       <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
     </div>
   `;
