@@ -16,6 +16,17 @@ const runDailySync = require("./runDailySync"); // Generates Daily Email
 const autoplan = require("./autoplan"); // Smart workout planner
 const { sanitizeRoutine } = require("./trainerUtils");
 const { getQuoteOfTheDay } = require("./quoteUtils");
+const fetchEveryWorkout = require('./fetchEveryWorkout');
+
+app.get('/fetch-all-history', async (req, res) => {
+  try {
+    await fetchEveryWorkout();
+    res.send('✅ Full workout history fetched and saved.');
+  } catch (err) {
+    console.error('❌ Failed to fetch history:', err.message);
+    res.status(500).send('Failed to fetch workout history.');
+  }
+});
 
 
 // 2. CONSTANTS AND CONFIGURATION
