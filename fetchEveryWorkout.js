@@ -4,13 +4,12 @@ const fs = require('fs');
 const path = require('path');
 const HEVY_API_KEY = process.env.HEVY_API_KEY;
 
-
 const outputPath = path.join(__dirname, 'data', 'workouts-full-history.json');
 
 async function fetchEveryWorkout() {
   let allWorkouts = [];
   let page = 1;
-  const perPage = 50; // Increase to fetch more per page
+  const perPage = 50;
   let totalPages = 1;
 
   console.log('📦 Fetching ALL Hevy workouts...');
