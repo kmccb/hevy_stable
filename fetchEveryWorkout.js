@@ -2,7 +2,8 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const { HEVY_API_KEY } = require('./secrets');
+const HEVY_API_KEY = process.env.HEVY_API_KEY;
+
 
 const outputPath = path.join(__dirname, 'data', 'workouts-full-history.json');
 
