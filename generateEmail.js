@@ -86,17 +86,17 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   const tips = [];
   const recentExercises = workouts.flatMap(w => w.exercises.map(e => e.title.toLowerCase()));
   const yesterdayCalories = estimateCalories(macros);
-  const avgCalories = parseFloat(macrosChart?.average?.calories) || 0;
-  const avgProtein = parseFloat(macrosChart?.average?.protein) || 0;
-  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 0;
-  const avgFat = parseFloat(macrosChart?.average?.fat) || 0;
+  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791; // Default to 1791 from PDF
+  const avgProtein = parseFloat(macrosChart?.average?.protein) || 170; // Default to 170g
+  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 135; // Default to 135g
+  const avgFat = parseFloat(macrosChart?.average?.fat) || 60; // Default to 60g
 
   // Rest day advice if no workouts
   if (!trainerInsights.length && !workouts.length) {
     tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery!");
   }
 
-  // Workout-based tips
+  // Workout-based tips with trainer reasoning
   trainerInsights.forEach(i => {
     const isDuration = i.title.toLowerCase().includes('plank') || i.title.toLowerCase().includes('hold') || i.title.toLowerCase().includes('walking');
     const isBodyweight = !i.avgWeightLbs || i.avgWeightLbs === 0 || isNaN(i.avgWeightLbs);
@@ -104,19 +104,21 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
 
     if (isDuration && i.avgDuration) {
       const newDuration = i.avgDuration + 5;
-      tip += `You held for ${i.avgDuration}s—aim for ${newDuration}s next time to build endurance.`;
+      tip += `You held for ${i.avgDuration}s consistently—try ${newDuration}s next time to push your endurance, but only if form stays solid.`;
     } else if (isBodyweight && i.avgReps && !isNaN(i.avgReps)) {
       const newReps = i.avgReps + 2;
-      tip += `You averaged ${i.avgReps} reps—push for ${newReps} next time to level up.`;
+      tip += `You averaged ${i.avgReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
     } else if (i.avgReps && i.avgWeightLbs && !isNaN(i.avgReps) && !isNaN(i.avgWeightLbs)) {
-      const newWeight = i.avgWeightLbs + 2.5;
+      const weightIncrease = Math.min(5, i.avgWeightLbs * 0.05); // 5% or 5 lbs max
+      const newWeight = (i.avgWeightLbs + weightIncrease).toFixed(1);
       const newReps = i.avgReps + 1;
-      tip += `You did ${i.avgReps} reps at ${i.avgWeightLbs} lbs—try ${newWeight} lbs or ${newReps} reps next session.`;
+      const effort = i.avgReps >= 10 ? "manageable" : "challenging";
+      tip += `You lifted ${i.avgWeightLbs} lbs for ${i.avgReps} reps, which felt ${effort}—consider ${newWeight} lbs or ${newReps} reps next time if your form held up, but don’t rush—focus on control first.`;
     } else {
-      tip += `Keep nailing your form—consistency is key!`;
+      tip += `Your form’s solid—keep it consistent and we’ll add reps or weight when you’re ready.`;
     }
 
-    // Avoid lower back risk (from past chats)
+    // Avoid lower back risk (from March 26 chat)
     if (i.title.toLowerCase().includes('deadlift')) {
       tip += ` Let’s swap this for glute bridges to protect your back.`;
     }
@@ -126,13 +128,13 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
 
   // Macro-based tips
   if (yesterdayCalories < avgCalories - 200) {
-    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—consider adding a snack to fuel your gains.`);
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
   } else if (yesterdayCalories > avgCalories + 200) {
-    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but adjust if cutting.`);
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
   }
 
   if (parseFloat(macros.protein) < avgProtein * 0.8) {
-    tips.push(`• Protein was ${formatNumber(macros.protein)}g yesterday—aim for closer to your ${formatNumber(avgProtein)}g average to support muscle growth.`);
+    tips.push(`• Protein was ${formatNumber(macros.protein)}g yesterday—boost it toward your ${formatNumber(avgProtein)}g average with chicken or eggs to support muscle growth.`);
   }
 
   return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
@@ -193,7 +195,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal</li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)}</li>
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
@@ -203,7 +205,7 @@ function generateHtmlSummary(
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
       <p>Check out these trends to see how far you've come:</p>
-      <p><strong>Weight</strong>:${formatNumber(macroValues.weight)} lbs yesterday</p>
+      <p><strong>Weight</strong>: ${formatNumber(macroValues.calories)}</p>
       <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
       <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
       <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
