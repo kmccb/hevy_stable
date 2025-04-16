@@ -2,7 +2,7 @@
 
 /**
  * Builds the full HTML content for the daily summary email.
- * Includes workouts, macros, charts, feedback, and a motivational quote.
+ * Includes workouts, macros, charts, feedback, and a motivational quote with a human, conversational tone.
  */
 
 /**
@@ -11,9 +11,11 @@
  * @returns {string} - HTML string of formatted workout.
  */
 function formatWorkoutForEmail(workout) {
-  if (!workout || !workout.exercises?.length) return "<p>No workout found.</p>";
+  if (!workout || !workout.exercises?.length) {
+    return "<p>Looks like no workout is planned today. Take it easy or sneak in some light movement!</p>";
+  }
 
-  const exerciseCells = workout.exercises.map(ex => {
+  const exerciseList = workout.exercises.map(ex => {
     const sets = ex.sets?.map(s => {
       if (s.duration_seconds) {
         return `${s.duration_seconds}s hold`;
@@ -26,21 +28,15 @@ function formatWorkoutForEmail(workout) {
       }
     }).join(", ");
 
-    return `<td style="vertical-align:top; padding:10px; width:50%;">
-      <strong>${ex.title}</strong><br>
-      Sets: ${sets}
-    </td>`;
-  });
+    return `<li><strong>${ex.title}</strong>: ${sets}</li>`;
+  }).join("");
 
-  // Combine into rows of 2 columns
-  let rows = "";
-  for (let i = 0; i < exerciseCells.length; i += 2) {
-    rows += `<tr>${exerciseCells[i]}${exerciseCells[i + 1] || "<td></td>"}</tr>`;
-  }
-
-  return `<table width="100%" cellspacing="0" cellpadding="0" border="0">${rows}</table>`;
+  return `
+    <ul style="list-style-type: disc; padding-left: 20px; line-height: 1.6;">
+      ${exerciseList}
+    </ul>
+  `;
 }
-
 
 function generateHtmlSummary(
   workouts,
@@ -51,93 +47,80 @@ function generateHtmlSummary(
   charts,
   todaysWorkout,
   quoteText
-) 
-{
-
+) {
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
 
-  // Function to get the total weight lossed/gained over 30 days for the email.
+  // Calculate weight change for a personal touch
   const weightChange = (() => {
     const validWeights = allMacrosData
       .map(m => parseFloat(m.weight))
       .filter(w => !isNaN(w));
     if (validWeights.length < 2) return null;
     const delta = validWeights.at(-1) - validWeights[0];
-    const direction = delta < 0 ? "Down" : "Up";
-    return `${direction} ${Math.abs(delta).toFixed(1)} lbs`;
+    const direction = delta < 0 ? "dropped" : "gained";
+    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs`;
   })();
 
-  const workoutBlock = workouts.map(w => {
-    const exBlocks = w.exercises.map(e => {
-      const setSummary = e.sets?.map(s => {
-        if (s.duration_seconds) return `${s.duration_seconds}s hold`;
-        if (s.reps != null && s.weight_kg != null) return `${(s.weight_kg * 2.20462).toFixed(1)} lbs x ${s.reps}`;
-        if (s.reps != null) return `Bodyweight x ${s.reps}`;
-        return "Set info missing";
-      }).join(", ");
+  // Format yesterday's workout with a friendly intro
+  const workoutBlock = workouts.length > 0 ? workouts.map(w => `
+    <h4 style="color: #333; font-size: 18px;">${w.title}</h4>
+    ${formatWorkoutForEmail(w)}
+  `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-      const note = trainerInsights.find(i => i.title === e.title)?.suggestion || "Maintain form and consistency";
-      return `<td style="vertical-align:top; padding:10px; width:50%;">
-        <strong>${e.title}</strong><br>
-        Sets: ${setSummary}<br>
-        <em>${note}</em>
-      </td>`;
-    });
-
-    // Convert array of <td> into rows of 2 columns
-    let rows = "";
-    for (let i = 0; i < exBlocks.length; i += 2) {
-      rows += `<tr>${exBlocks[i]}${exBlocks[i + 1] || "<td></td>"}</tr>`;
-    }
-
-    return `<h4>Workout: ${w.title}</h4>
-      <table width="100%" cellspacing="0" cellpadding="0" border="0">${rows}</table>`;
-  }).join("<br><br>");
-
+  // Make feedback feel like advice from a coach
   const feedback = trainerInsights.length > 0
-    ? trainerInsights.map(i => `• <strong>${i.title}</strong>: ${i.suggestion} (avg ${i.avgReps} reps @ ${i.avgWeightLbs} lbs)`).join("<br>")
-    : "Rest day — no exercise trends to analyze. Use today to prepare for tomorrow’s push.";
+    ? trainerInsights.map(i => `• <strong>${i.title}</strong>: ${i.suggestion} (${i.avgReps ? `avg ${i.avgReps} reps` : 'bodyweight'}, ${i.avgWeightLbs ? `@ ${i.avgWeightLbs} lbs` : 'no weight'})`).join("<br>")
+    : "Looks like a rest day yesterday. Perfect time to recharge for what's next!";
 
   return `
-    <h3>💪 Yesterday's Workout Summary</h3>${workoutBlock}<br><br>
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+      <h2 style="color: #2c3e50; font-size: 24px;">Hey there! Here's Your Daily Fitness Update</h2>
+      <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
 
-    <h3>🥗 Macros – ${macros.date}</h3>
-    <ul>
-      <li><strong>Calories:</strong> ${macros.calories} kcal</li>
-      <li><strong>Protein:</strong> ${macros.protein}g</li>
-      <li><strong>Carbs:</strong> ${macros.carbs}g</li>
-      <li><strong>Fat:</strong> ${macros.fat}g</li>
-      <li><strong>Weight:</strong> ${macros.weight} lbs</li>
-      <li><strong>Steps:</strong> ${macros.steps}</li>
-    </ul>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
+      ${workoutBlock}
 
-    <h3>📉 Weight Trend (Last 30 Days) ${weightChange ? `– ${weightChange}!` : ""}</h3>
-    <img src="cid:weightChart" alt="Weight chart"><br>
-    
-    <h3>🚶 Steps Trend (Last 30 Days) - Avg: ${stepsChart?.average || "N/A"} steps</h3>
-    <img src="cid:stepsChart" alt="Steps chart"><br>
-      
-    <h3>🍳 Macro Trend (Last 30 Days) - Avg Protein: ${macrosChart?.average?.protein || "N/A"}g, Carbs: ${macrosChart?.average?.carbs || "N/A"}g, Fat: ${macrosChart?.average?.fat || "N/A"}g</h3>
-    <img src="cid:macrosChart" alt="Macros chart"><br>
-      
-    <h3>🔥 Calorie Trend (Last 30 Days) - Avge: ${calorieChart?.average || "N/A"} kcal</h3>
-    <img src="cid:caloriesChart" alt="Calories chart"><br>
-      
-    <h3>🧠 Trainer Feedback</h3>${feedback}<br><br>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${macros.date})</h3>
+      <p>Here's how you fueled up yesterday:</p>
+      <ul style="list-style-type: disc; padding-left: 20px;">
+        <li><strong>Calories</strong>: ${macros.calories} kcal</li>
+        <li><strong>Protein</strong>: ${macros.protein}g</li>
+        <li><strong>Carbs</strong>: ${macros.carbs}g</li>
+        <li><strong>Fat</strong>: ${macros.fat}g</li>
+        <li><strong>Weight</strong>: ${macros.weight} lbs ${weightChange ? `(${weightChange} over 30 days—nice work!)` : ""}</li>
+        <li><strong>Steps</strong>: ${macros.steps}</li>
+      </ul>
 
-    <h3>📅 What’s Next</h3>
-    Today is <strong>Day ${todayTargetDay}</strong>. Focus on:<br>
-    - Intentional form<br>
-    - Progressive overload<br>
-    - Core tension & recovery<br><br>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
+      <p>Check out these trends to see how far you've come:</p>
+      <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
+      <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
+      <p><strong>Steps</strong>: Averaging ${stepsChart?.average || "N/A"} steps/day</p>
+      <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
+      <p><strong>Macros</strong>: Protein ${macrosChart?.average?.protein || "N/A"}g, Carbs ${macrosChart?.average?.carbs || "N/A"}g, Fat ${macrosChart?.average?.fat || "N/A"}g</p>
+      <img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">
+      <p><strong>Calories</strong>: Averaging ${calorieChart?.average || "N/A"} kcal/day</p>
+      <img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">
 
-    <h3>🏋️ Today’s CoachGPT Workout</h3>
-    ${formatWorkoutForEmail(todaysWorkout)}<br><br>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
+      <p>${feedback}</p>
 
-    <h3>🧭 Daily Inspiration</h3>
-    <em>${quoteText}</em><br><br>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Game Plan for Today (Day ${todayTargetDay})</h3>
+      <p>Let’s keep the momentum going. Focus on:</p>
+      <ul style="list-style-type: disc; padding-left: 20px;">
+        <li>Intentional form—quality over quantity</li>
+        <li>Progressive overload—push just a bit harder</li>
+        <li>Core tension & recovery—stay balanced</li>
+      </ul>
 
-    Keep it up — I’ve got your back.<br>– CoachGPT
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Today’s Workout Plan</h3>
+      ${formatWorkoutForEmail(todaysWorkout)}
+
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">A Little Inspiration</h3>
+      <p style="font-style: italic; color: #555;">"${quoteText}"</p>
+      <p style="font-size: 16px;">You’ve got this! Keep pushing, and I’m here cheering you on.</p>
+      <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
+    </div>
   `;
 }
 
