@@ -1,5 +1,3 @@
-// generateEmail.js
-
 /**
  * Builds the full HTML content for the daily summary email.
  * Includes workouts, macros, charts, feedback, and a motivational quote with a human, conversational tone.
@@ -38,6 +36,15 @@ function formatWorkoutForEmail(workout) {
   `;
 }
 
+/**
+ * Formats numbers with commas for readability (e.g., 11515 -> 11,515).
+ * @param {number} num - The number to format.
+ * @returns {string} - Formatted number with commas.
+ */
+function formatNumber(num) {
+  return Number.isFinite(num) ? num.toLocaleString('en-US') : 'N/A';
+}
+
 function generateHtmlSummary(
   workouts,
   macros,
@@ -67,9 +74,25 @@ function generateHtmlSummary(
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  // Make feedback feel like advice from a coach
+  // Enhanced feedback for bodyweight and duration-based exercises
   const feedback = trainerInsights.length > 0
-    ? trainerInsights.map(i => `• <strong>${i.title}</strong>: ${i.suggestion} (${i.avgReps ? `avg ${i.avgReps} reps` : 'bodyweight'}, ${i.avgWeightLbs ? `@ ${i.avgWeightLbs} lbs` : 'no weight'})`).join("<br>")
+    ? trainerInsights.map(i => {
+        const isDuration = i.title.toLowerCase().includes('plank') || i.title.toLowerCase().includes('hold') || i.title.toLowerCase().includes('walking');
+        const isBodyweight = !i.avgWeightLbs || i.avgWeightLbs === 0 || isNaN(i.avgWeightLbs);
+        
+        let metrics = '';
+        if (isDuration) {
+          metrics = i.avgDuration ? `(avg ${i.avgDuration}s)` : '(focus on form)';
+        } else if (isBodyweight) {
+          metrics = i.avgReps && !isNaN(i.avgReps) ? `(avg ${i.avgReps} reps)` : '(bodyweight)';
+        } else {
+          metrics = (i.avgReps && !isNaN(i.avgReps) && i.avgWeightLbs && !isNaN(i.avgWeightLbs))
+            ? `(avg ${i.avgReps} reps @ ${i.avgWeightLbs} lbs)`
+            : '(maintain form)';
+        }
+        
+        return `• <strong>${i.title}</strong>: ${i.suggestion} ${metrics}`;
+      }).join("<br>")
     : "Looks like a rest day yesterday. Perfect time to recharge for what's next!";
 
   return `
@@ -83,23 +106,23 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${macros.date})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${macros.calories} kcal</li>
-        <li><strong>Protein</strong>: ${macros.protein}g</li>
-        <li><strong>Carbs</strong>: ${macros.carbs}g</li>
-        <li><strong>Fat</strong>: ${macros.fat}g</li>
-        <li><strong>Weight</strong>: ${macros.weight} lbs ${weightChange ? `(${weightChange} over 30 days—nice work!)` : ""}</li>
-        <li><strong>Steps</strong>: ${macros.steps}</li>
+        <li><strong>Calories</strong>: ${formatNumber(macros.calories)} kcal</li>
+        <li><strong>Protein</strong>: ${formatNumber(macros.protein)}g</li>
+        <li><strong>Carbs</strong>: ${formatNumber(macros.carbs)}g</li>
+        <li><strong>Fat</strong>: ${formatNumber(macros.fat)}g</li>
+        <li><strong>Weight</strong>: ${formatNumber(macros.weight)} lbs ${weightChange ? `(${weightChange} over 30 days—nice work!)` : ""}</li>
+        <li><strong>Steps</strong>: ${formatNumber(macros.steps)}</li>
       </ul>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
       <p>Check out these trends to see how far you've come:</p>
       <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
       <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Steps</strong>: Averaging ${stepsChart?.average || "N/A"} steps/day</p>
+      <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
       <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Macros</strong>: Protein ${macrosChart?.average?.protein || "N/A"}g, Carbs ${macrosChart?.average?.carbs || "N/A"}g, Fat ${macrosChart?.average?.fat || "N/A"}g</p>
+      <p><strong>Macros</strong>: Protein ${formatNumber(macrosChart?.average?.protein)}g, Carbs ${formatNumber(macrosChart?.average?.carbs)}g, Fat ${formatNumber(macrosChart?.average?.fat)}g</p>
       <img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Calories</strong>: Averaging ${calorieChart?.average || "N/A"} kcal/day</p>
+      <p><strong>Calories</strong>: Averaging ${formatNumber(calorieChart?.average)} kcal/day</p>
       <img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
