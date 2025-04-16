@@ -44,10 +44,18 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
       const weight = data.maxWeight * 2.20462;
       return `${title}: 🏋 ${data.totalSessions} sessions | Max: ${weight.toFixed(1)} lbs`;
     })
-    .slice(0, 5) // limit to top 5
+    .slice(0, 5)
     .join('\n');
 
-  const workoutBreakdown = todaysWorkout.map(summarizeExercise).join('\n\n');
+  const usedIds = new Set();
+  const workoutBreakdown = todaysWorkout
+    .filter(ex => {
+      if (usedIds.has(ex.exercise_template_id)) return false;
+      usedIds.add(ex.exercise_template_id);
+      return true;
+    })
+    .map(summarizeExercise)
+    .join('\n\n');
 
   return `
 💪 Yesterday's Workout Summary
