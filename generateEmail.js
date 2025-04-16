@@ -73,6 +73,46 @@ function formatDate(date) {
   }
 }
 
+/**
+ * Generates personalized coach tips based on workout data and trends.
+ * @param {Array} trainerInsights - Array of insight objects with exercise data.
+ * @param {Object} workouts - Yesterday's workout data.
+ * @returns {string} - HTML string of tailored tips.
+ */
+function generateCoachTips(trainerInsights, workouts) {
+  if (!trainerInsights.length && !workouts.length) {
+    return "Looks like a rest day yesterday. Focus on stretching or a light walk to recover!";
+  }
+
+  const tips = [];
+  const recentExercises = workouts.length ? workouts.flatMap(w => w.exercises.map(e => e.title.toLowerCase())) : [];
+
+  trainerInsights.forEach(i => {
+    const isDuration = i.title.toLowerCase().includes('plank') || i.title.toLowerCase().includes('hold') || i.title.toLowerCase().includes('walking');
+    const isBodyweight = !i.avgWeightLbs || i.avgWeightLbs === 0 || isNaN(i.avgWeightLbs);
+    let tip = `• <strong>${i.title}</strong>: ${i.suggestion}`;
+
+    if (isDuration && i.avgDuration) {
+      tip += ` (try holding for ${i.avgDuration + 5}s next time to challenge yourself)`;
+    } else if (isBodyweight && i.avgReps && !isNaN(i.avgReps)) {
+      tip += ` (aim for ${i.avgReps + 2} reps next time for progress)`;
+    } else if (i.avgReps && i.avgWeightLbs && !isNaN(i.avgReps) && !isNaN(i.avgWeightLbs)) {
+      tip += ` (consider adding 2.5 lbs or 1-2 reps next session)`;
+    } else {
+      tip += ` (focus on perfect form to build strength safely)`;
+    }
+
+    // Avoid lower back risk advice from past chats
+    if (i.title.toLowerCase().includes('deadlift')) {
+      tip += ` (let’s skip this—try glute bridges instead for safety)`;
+    }
+
+    tips.push(tip);
+  });
+
+  return tips.length ? tips.join("<br>") : "Great job yesterday—keep up the consistency!";
+}
+
 function generateHtmlSummary(
   workouts,
   macros,
@@ -103,26 +143,8 @@ function generateHtmlSummary(
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  // Enhanced feedback for bodyweight and duration-based exercises
-  const feedback = trainerInsights.length > 0
-    ? trainerInsights.map(i => {
-        const isDuration = i.title.toLowerCase().includes('plank') || i.title.toLowerCase().includes('hold') || i.title.toLowerCase().includes('walking');
-        const isBodyweight = !i.avgWeightLbs || i.avgWeightLbs === 0 || isNaN(i.avgWeightLbs);
-        
-        let metrics = '';
-        if (isDuration) {
-          metrics = i.avgDuration ? `(avg ${i.avgDuration}s)` : '(focus on form)';
-        } else if (isBodyweight) {
-          metrics = i.avgReps && !isNaN(i.avgReps) ? `(avg ${i.avgReps} reps)` : '(bodyweight)';
-        } else {
-          metrics = (i.avgReps && !isNaN(i.avgReps) && i.avgWeightLbs && !isNaN(i.avgWeightLbs))
-            ? `(avg ${i.avgReps} reps @ ${i.avgWeightLbs} lbs)`
-            : '(maintain form)';
-        }
-        
-        return `• <strong>${i.title}</strong>: ${i.suggestion} ${metrics}`;
-      }).join("<br>")
-    : "Looks like a rest day yesterday. Perfect time to recharge for what's next!";
+  // Enhanced and personalized coach tips
+  const coachTips = generateCoachTips(trainerInsights, workouts);
 
   // Handle missing macros data with N/A and estimate calories
   const macroValues = {
@@ -146,7 +168,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal </li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
@@ -166,16 +188,8 @@ function generateHtmlSummary(
       <img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
-      <p>${feedback}</p>
+      <p>${coachTips}</p>
       <hr style="border: 1px solid #eee; margin: 20px 0;">
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Game Plan for Today (Day ${todayTargetDay})</h3>
-      <p>Let’s keep the momentum going. Focus on:</p>
-      <ul style="list-style-type: disc; padding-left: 20px;">
-        <li>Intentional form—quality over quantity</li>
-        <li>Progressive overload—push just a bit harder</li>
-        <li>Core tension & recovery—stay balanced</li>
-      </ul>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Today’s Workout Plan</h3>
       ${formatWorkoutForEmail(todaysWorkout)}
