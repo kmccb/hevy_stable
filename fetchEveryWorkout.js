@@ -9,7 +9,7 @@ const outputPath = path.join(__dirname, 'data', 'workouts-full-history.json');
 async function fetchEveryWorkout() {
   let allWorkouts = [];
   let page = 1;
-  const perPage = 50;
+  const perPage = 50; // Increase to fetch more per page
   let totalPages = 1;
 
   console.log('📦 Fetching ALL Hevy workouts...');
@@ -26,8 +26,8 @@ async function fetchEveryWorkout() {
         console.log(`📃 Page ${page} retrieved: ${data.workouts.length} workouts`);
       }
 
-      if (data?.pagination) {
-        totalPages = data.pagination.total_pages || 1;
+      if (data?.pagination?.total_pages) {
+        totalPages = data.pagination.total_pages;
       }
 
       page++;

@@ -1,2 +1,3 @@
 hevy-*.json
 .env
+secrets.js
