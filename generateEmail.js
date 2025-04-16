@@ -37,12 +37,12 @@ function formatWorkoutForEmail(workout) {
 }
 
 /**
- * Formats numbers with commas for readability (e.g., 11515 -> 11,515).
- * @param {number} num - The number to format.
- * @returns {string} - Formatted number with commas.
+ * Formats numbers with commas for readability (e.g., 11515 -> 11,515) or returns N/A for invalid input.
+ * @param {number|string} num - The number to format.
+ * @returns {string} - Formatted number with commas or 'N/A'.
  */
 function formatNumber(num) {
-  return Number.isFinite(num) ? num.toLocaleString('en-US') : 'N/A';
+  return Number.isFinite(parseFloat(num)) ? parseFloat(num).toLocaleString('en-US') : 'N/A';
 }
 
 function generateHtmlSummary(
@@ -65,7 +65,7 @@ function generateHtmlSummary(
     if (validWeights.length < 2) return null;
     const delta = validWeights.at(-1) - validWeights[0];
     const direction = delta < 0 ? "dropped" : "gained";
-    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs`;
+    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—nice work!`;
   })();
 
   // Format yesterday's workout with a friendly intro
@@ -95,6 +95,16 @@ function generateHtmlSummary(
       }).join("<br>")
     : "Looks like a rest day yesterday. Perfect time to recharge for what's next!";
 
+  // Handle missing macros data with N/A
+  const macroValues = {
+    calories: macros.calories || 'N/A',
+    protein: macros.protein || 'N/A',
+    carbs: macros.carbs || 'N/A',
+    fat: macros.fat || 'N/A',
+    weight: macros.weight || 'N/A',
+    steps: macros.steps || 'N/A'
+  };
+
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
       <h2 style="color: #2c3e50; font-size: 24px;">Hey there! Here's Your Daily Fitness Update</h2>
@@ -103,15 +113,15 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
       ${workoutBlock}
 
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${macros.date})</h3>
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${macros.date || 'N/A'})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macros.calories)} kcal</li>
-        <li><strong>Protein</strong>: ${formatNumber(macros.protein)}g</li>
-        <li><strong>Carbs</strong>: ${formatNumber(macros.carbs)}g</li>
-        <li><strong>Fat</strong>: ${formatNumber(macros.fat)}g</li>
-        <li><strong>Weight</strong>: ${formatNumber(macros.weight)} lbs ${weightChange ? `(${weightChange} over 30 days—nice work!)` : ""}</li>
-        <li><strong>Steps</strong>: ${formatNumber(macros.steps)}</li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal</li>
+        <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
+        <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
+        <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
+        <li><strong>Weight</strong>: ${formatNumber(macroValues.weight)} lbs ${weightChange ? `(${weightChange})` : ""}</li>
+        <li><strong>Steps</strong>: ${formatNumber(macroValues.steps)}</li>
       </ul>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
