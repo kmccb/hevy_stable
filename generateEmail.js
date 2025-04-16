@@ -1,8 +1,11 @@
-// generateEmail.js – CoachGPT v1.5
+// generateEmail.js – CoachGPT v1.5 (patched for null macros)
 const analyzeLongTermTrends = require('./analyzeLongTermTrends');
 
 function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout }) {
   const trends = analyzeLongTermTrends();
+
+  // Patch: ensure macros always has safe defaults
+  macros = macros || { calories: 0, protein: 0, carbs: 0, fat: 0, date: '—' };
 
   const summarizeExercise = (ex) => {
     const sets = ex.sets.map(set => {
@@ -35,7 +38,7 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
     if (kcal < 1400) comment = '⬇️ Calories low – consider a small increase';
     else if (macros.protein < 160) comment = '⚠️ Protein under target';
     else comment = '✅ Solid macro day';
-    return `${comment}\nCalories: ${kcal} kcal\nProtein: ${macros.protein}g\nCarbs: ${macros.carbs}g\nFat: ${macros.fat}g\nWeight: ${weight} lbs\nSteps: ${steps.toLocaleString()}`;
+    return `${comment}\nCalories: ${kcal} kcal\nProtein: ${macros.protein}g\nCarbs: ${macros.carbs}g\nFat: ${macros.fat}g\nWeight: ${weight} lbs\nSteps: ${steps?.toLocaleString?.() || steps}`;
   };
 
   const longTermHighlights = Object.entries(trends || {})
@@ -64,12 +67,7 @@ Workout: ${yesterdayWorkout?.title || '—'}
 
 ${summarizeTrainerFeedback()}
 
-if (!macros || typeof macros !== 'object') {
-  macros = { calories: 0, protein: 0, carbs: 0, fat: 0, date: '—' };
-}
-
 🥗 Macros – ${macros?.date || '—'}
-
 
 ${summarizeMacroFeedback()}
 
