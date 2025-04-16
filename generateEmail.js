@@ -110,7 +110,7 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
       tip += `You averaged ${i.avgReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
     } else if (i.avgReps && i.avgWeightLbs && !isNaN(i.avgReps) && !isNaN(i.avgWeightLbs)) {
       const weightIncrease = Math.min(5, i.avgWeightLbs * 0.05); // 5% or 5 lbs max
-      const newWeight = (i.avgWeightLbs + weightIncrease).toFixed(1);
+      const newWeight = Number.isFinite(i.avgWeightLbs) ? (i.avgWeightLbs + weightIncrease).toFixed(1) : i.avgWeightLbs;
       const newReps = i.avgReps + 1;
       const effort = i.avgReps >= 10 ? "manageable" : "challenging";
       tip += `You lifted ${i.avgWeightLbs} lbs for ${i.avgReps} reps, which felt ${effort}—consider ${newWeight} lbs or ${newReps} reps next time if your form held up, but don’t rush—focus on control first.`;
@@ -195,7 +195,7 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
       <p>Here's how you fueled up yesterday:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)}</li>
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
@@ -205,7 +205,7 @@ function generateHtmlSummary(
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
       <p>Check out these trends to see how far you've come:</p>
-      <p><strong>Weight</strong>: ${formatNumber(macroValues.calories)}</p>
+      <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
       <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
       <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
       <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
