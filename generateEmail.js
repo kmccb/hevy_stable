@@ -84,7 +84,6 @@ function formatDate(date) {
  */
 function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
   const tips = [];
-  const recentExercises = workouts.flatMap(w => w.exercises.map(e => e.title.toLowerCase()));
   const yesterdayCalories = estimateCalories(macros);
   const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791; // Default to 1791 from PDF
   const avgProtein = parseFloat(macrosChart?.average?.protein) || 170; // Default to 170g
@@ -92,34 +91,51 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   const avgFat = parseFloat(macrosChart?.average?.fat) || 60; // Default to 60g
 
   // Rest day advice if no workouts
-  if (!trainerInsights.length && !workouts.length) {
+  if (!workouts.length) {
     tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery!");
   }
 
-  // Workout-based tips with trainer reasoning
-  trainerInsights.forEach(i => {
-    const isDuration = i.title.toLowerCase().includes('plank') || i.title.toLowerCase().includes('hold') || i.title.toLowerCase().includes('walking');
-    const isBodyweight = !i.avgWeightLbs || i.avgWeightLbs === 0 || isNaN(i.avgWeightLbs);
-    let tip = `• <strong>${i.title}</strong>: `;
+  // Get max performance from workouts
+  const exerciseStats = {};
+  workouts.forEach(w => {
+    w.exercises.forEach(ex => {
+      const title = ex.title.toLowerCase();
+      if (!exerciseStats[title]) {
+        exerciseStats[title] = { maxReps: 0, maxWeight: 0 };
+      }
+      ex.sets.forEach(s => {
+        if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
+        if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
+          exerciseStats[title].maxWeight = (s.weight_kg * 2.20462).toFixed(1);
+        }
+      });
+    });
+  });
 
-    if (isDuration && i.avgDuration) {
-      const newDuration = i.avgDuration + 5;
-      tip += `You held for ${i.avgDuration}s consistently—try ${newDuration}s next time to push your endurance, but only if form stays solid.`;
-    } else if (isBodyweight && i.maxReps && !isNaN(i.maxReps)) {
-      const newReps = i.maxReps + 2;
-      tip += `You hit ${i.maxReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
-    } else if (i.maxReps && i.maxWeightLbs && !isNaN(i.maxReps) && !isNaN(i.maxWeightLbs)) {
-      const weightIncrease = Math.min(5, i.maxWeightLbs * 0.05); // 5% or 5 lbs max
-      const newWeight = Number.isFinite(i.maxWeightLbs) ? (i.maxWeightLbs + weightIncrease).toFixed(1) : i.maxWeightLbs;
-      const newReps = i.maxReps + 1;
-      const effort = i.maxReps >= 10 ? "manageable" : "challenging";
-      tip += `You lifted ${i.maxWeightLbs} lbs for ${i.maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
+  // Workout-based tips with trainer reasoning
+  Object.keys(exerciseStats).forEach(title => {
+    const isDuration = title.includes('plank') || title.includes('hold') || title.includes('walking');
+    let tip = `• <strong>${title.charAt(0).toUpperCase() + title.slice(1)}</strong>: `;
+
+    if (isDuration && exerciseStats[title].maxReps === 0 && workouts.some(w => w.exercises.some(e => e.title.toLowerCase() === title && e.sets.some(s => s.duration_seconds)))) {
+      const duration = Math.max(...workouts.flatMap(w => w.exercises.filter(e => e.title.toLowerCase() === title).flatMap(e => e.sets.map(s => s.duration_seconds || 0))).filter(d => d));
+      const newDuration = duration + 5;
+      tip += `You held for ${duration}s consistently—try ${newDuration}s next time to push your endurance, but only if form stays solid.`;
+    } else if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight === 0) {
+      const newReps = exerciseStats[title].maxReps + 2;
+      tip += `You hit ${exerciseStats[title].maxReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
+    } else if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight > 0) {
+      const weightIncrease = Math.min(5, exerciseStats[title].maxWeight * 0.05);
+      const newWeight = Number.isFinite(exerciseStats[title].maxWeight) ? (parseFloat(exerciseStats[title].maxWeight) + weightIncrease).toFixed(1) : exerciseStats[title].maxWeight;
+      const newReps = exerciseStats[title].maxReps + 1;
+      const effort = exerciseStats[title].maxReps >= 10 ? "manageable" : "challenging";
+      tip += `You lifted ${exerciseStats[title].maxWeight} lbs for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
     } else {
       tip += `Your form’s solid—keep it consistent and we’ll add reps or weight when you’re ready.`;
     }
 
     // Avoid lower back risk (from March 26 chat)
-    if (i.title.toLowerCase().includes('deadlift')) {
+    if (title.includes('deadlift')) {
       tip += ` Let’s swap this for glute bridges to protect your back.`;
     }
 
