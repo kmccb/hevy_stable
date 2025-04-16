@@ -45,6 +45,24 @@ function formatNumber(num) {
   return Number.isFinite(parseFloat(num)) ? parseFloat(num).toLocaleString('en-US') : 'N/A';
 }
 
+/**
+ * Estimates calories from macros if the provided value seems invalid.
+ * @param {Object} macros - Macros object with calories, protein, carbs, fat.
+ * @returns {number|string} - Estimated or provided calories.
+ */
+function estimateCalories(macros) {
+  const protein = parseFloat(macros.protein) || 0;
+  const carbs = parseFloat(macros.carbs) || 0;
+  const fat = parseFloat(macros.fat) || 0;
+  const providedCalories = parseFloat(macros.calories) || 0;
+
+  // Calculate estimated calories: protein and carbs (4 kcal/g), fat (9 kcal/g)
+  const estimatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
+
+  // If provided calories is suspiciously low (< 500 kcal) compared to estimate, use estimate
+  return providedCalories < 500 && estimatedCalories > 500 ? estimatedCalories : providedCalories;
+}
+
 function generateHtmlSummary(
   workouts,
   macros,
@@ -95,9 +113,9 @@ function generateHtmlSummary(
       }).join("<br>")
     : "Looks like a rest day yesterday. Perfect time to recharge for what's next!";
 
-  // Handle missing macros data with N/A
+  // Handle missing macros data with N/A and estimate calories if needed
   const macroValues = {
-    calories: macros.calories || 'N/A',
+    calories: estimateCalories(macros),
     protein: macros.protein || 'N/A',
     carbs: macros.carbs || 'N/A',
     fat: macros.fat || 'N/A',
