@@ -1,4 +1,4 @@
-// generateEmail.js – CoachGPT Full Format Restored with Inline Charts (v1.5.3)
+// generateEmail.js – CoachGPT Full Format Restored with Inline Charts (v1.5.4)
 const analyzeLongTermTrends = require('./analyzeLongTermTrends');
 const fs = require('fs');
 const path = require('path');
@@ -38,7 +38,7 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
 
   const macroInsights = () => {
     const kcal = macros.calories;
-    if (kcal === 0) return 'Macros unavailable.';
+    if (!kcal || kcal === 0) return 'Macros unavailable.';
     let comment = '✅ Great macro execution!';
     if (macros.protein < 160) comment = '⚠️ Protein below target.';
     if (kcal < 1400) comment = '⬇️ Calories too low – fuel up!';
@@ -58,28 +58,27 @@ function generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout 
     try {
       const filepath = path.join(__dirname, 'charts', filename);
       const file = fs.readFileSync(filepath);
-      return `<img src="data:image/png;base64,${file.toString('base64')}" alt="${filename}" style="max-width: 100%; height: auto;"/>`;
+      return `<img src="data:image/png;base64,${file.toString('base64')}" alt="${filename}" style="width: 24%; margin-right: 1%; vertical-align: top;"/>`;
     } catch {
       return '';
     }
   };
 
-  const chartsHTML = ['weight.png', 'steps.png', 'macros.png', 'calories.png']
-    .map(encodeChart)
-    .join('<br>');
+  const chartsHTML = `<div style="display: flex; justify-content: space-between; flex-wrap: wrap;">` +
+    ['weight.png', 'steps.png', 'macros.png', 'calories.png'].map(encodeChart).join('') + '</div>';
 
   const body = `
   <h2>🎯 Hevy Daily Summary – ${macros.date}</h2>
 
   <h3>📌 Yesterday’s Workout</h3>
-  <p><b>Workout:</b> ${yesterdayWorkout?.title || '—'}</p>
+  <p><b>Workout:</b> ${yesterdayWorkout?.title || (yesterdayWorkout?.exercises?.length ? '(Untitled)' : '—')}</p>
   <ul>${summarizeTrainerFeedback()}</ul>
 
   <h3>🏋️ Today’s CoachGPT Workout</h3>
   ${summarizeWorkout('Routine', todaysWorkout)}
 
   <h3>🥗 Macros</h3>
-  <p>${macroInsights()}<br>Weight: ${weight} lbs | Steps: ${steps.toLocaleString()}</p>
+  <p>${macroInsights()}<br>Weight: ${weight} lbs | Steps: ${steps?.toLocaleString?.() || 0}</p>
 
   <h3>📈 Long-Term Trends</h3>
   <ul>${longTerm || '<li>No trend data yet</li>'}</ul>
