@@ -74,43 +74,68 @@ function formatDate(date) {
 }
 
 /**
- * Generates personalized coach tips based on workout data and trends.
+ * Generates personalized coach tips based on workout and macro history.
  * @param {Array} trainerInsights - Array of insight objects with exercise data.
- * @param {Object} workouts - Yesterday's workout data.
+ * @param {Array} workouts - Array of recent workout objects.
+ * @param {Object} macros - Current macros data.
+ * @param {Object} allMacrosData - Historical macros data.
+ * @param {Object} macrosChart - Average macro trends.
  * @returns {string} - HTML string of tailored tips.
  */
-function generateCoachTips(trainerInsights, workouts) {
+function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
+  const tips = [];
+  const recentExercises = workouts.flatMap(w => w.exercises.map(e => e.title.toLowerCase()));
+  const yesterdayCalories = estimateCalories(macros);
+  const avgCalories = parseFloat(macrosChart?.average?.calories) || 0;
+  const avgProtein = parseFloat(macrosChart?.average?.protein) || 0;
+  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 0;
+  const avgFat = parseFloat(macrosChart?.average?.fat) || 0;
+
+  // Rest day advice if no workouts
   if (!trainerInsights.length && !workouts.length) {
-    return "Looks like a rest day yesterday. Focus on stretching or a light walk to recover!";
+    tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery!");
   }
 
-  const tips = [];
-  const recentExercises = workouts.length ? workouts.flatMap(w => w.exercises.map(e => e.title.toLowerCase())) : [];
-
+  // Workout-based tips
   trainerInsights.forEach(i => {
     const isDuration = i.title.toLowerCase().includes('plank') || i.title.toLowerCase().includes('hold') || i.title.toLowerCase().includes('walking');
     const isBodyweight = !i.avgWeightLbs || i.avgWeightLbs === 0 || isNaN(i.avgWeightLbs);
-    let tip = `• <strong>${i.title}</strong>: ${i.suggestion}`;
+    let tip = `• <strong>${i.title}</strong>: `;
 
     if (isDuration && i.avgDuration) {
-      tip += ` (try holding for ${i.avgDuration + 5}s next time to challenge yourself)`;
+      const newDuration = i.avgDuration + 5;
+      tip += `You held for ${i.avgDuration}s—aim for ${newDuration}s next time to build endurance.`;
     } else if (isBodyweight && i.avgReps && !isNaN(i.avgReps)) {
-      tip += ` (aim for ${i.avgReps + 2} reps next time for progress)`;
+      const newReps = i.avgReps + 2;
+      tip += `You averaged ${i.avgReps} reps—push for ${newReps} next time to level up.`;
     } else if (i.avgReps && i.avgWeightLbs && !isNaN(i.avgReps) && !isNaN(i.avgWeightLbs)) {
-      tip += ` (consider adding 2.5 lbs or 1-2 reps next session)`;
+      const newWeight = i.avgWeightLbs + 2.5;
+      const newReps = i.avgReps + 1;
+      tip += `You did ${i.avgReps} reps at ${i.avgWeightLbs} lbs—try ${newWeight} lbs or ${newReps} reps next session.`;
     } else {
-      tip += ` (focus on perfect form to build strength safely)`;
+      tip += `Keep nailing your form—consistency is key!`;
     }
 
-    // Avoid lower back risk advice from past chats
+    // Avoid lower back risk (from past chats)
     if (i.title.toLowerCase().includes('deadlift')) {
-      tip += ` (let’s skip this—try glute bridges instead for safety)`;
+      tip += ` Let’s swap this for glute bridges to protect your back.`;
     }
 
     tips.push(tip);
   });
 
-  return tips.length ? tips.join("<br>") : "Great job yesterday—keep up the consistency!";
+  // Macro-based tips
+  if (yesterdayCalories < avgCalories - 200) {
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—consider adding a snack to fuel your gains.`);
+  } else if (yesterdayCalories > avgCalories + 200) {
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but adjust if cutting.`);
+  }
+
+  if (parseFloat(macros.protein) < avgProtein * 0.8) {
+    tips.push(`• Protein was ${formatNumber(macros.protein)}g yesterday—aim for closer to your ${formatNumber(avgProtein)}g average to support muscle growth.`);
+  }
+
+  return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
 }
 
 function generateHtmlSummary(
@@ -144,7 +169,7 @@ function generateHtmlSummary(
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
   // Enhanced and personalized coach tips
-  const coachTips = generateCoachTips(trainerInsights, workouts);
+  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart);
 
   // Handle missing macros data with N/A and estimate calories
   const macroValues = {
