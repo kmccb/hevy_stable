@@ -27,7 +27,17 @@ async function runDailySync() {
     const routines = JSON.parse(fs.readFileSync("data/routines.json"));
 
     const autoplanResult = await autoplan({ workouts, templates, routines });
-    const todaysWorkout = autoplanResult.routine.routine[0];
+    console.log('autoplanResult in runDailySync.js:', JSON.stringify(autoplanResult));
+
+    // Ensure todaysWorkout has a title and exercises
+    let todaysWorkout = autoplanResult?.routine?.routine?.[0];
+    if (!todaysWorkout || typeof todaysWorkout !== 'object') {
+      console.warn("Warning: todaysWorkout is invalid after autoplan. Using fallback.");
+      todaysWorkout = { title: "Rest Day", exercises: [] };
+    } else if (!todaysWorkout.title) {
+      console.warn("Warning: todaysWorkout is missing a title. Adding fallback title.");
+      todaysWorkout.title = "CoachGPT – Planned Workout";
+    }
     console.log('todaysWorkout after autoplan in runDailySync.js:', JSON.stringify(todaysWorkout));
 
     const recentWorkouts = await getYesterdaysWorkouts();

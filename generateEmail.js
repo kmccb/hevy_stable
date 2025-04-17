@@ -143,18 +143,19 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     return "No workout plan available today—let’s focus on recovery! How are you feeling? Reply to tweak tomorrow’s plan.";
   }
 
+  // Check specifically for title property
+  if (!todaysWorkout.title || typeof todaysWorkout.title !== 'string') {
+    console.error("Error: todaysWorkout.title is missing or invalid:", todaysWorkout);
+    return "No workout title available today—let’s focus on recovery! How are you feeling? Reply to tweak tomorrow’s plan.";
+  }
+
   const tips = [];
   const yesterdayCalories = estimateCalories(macros);
   const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
   const avgProtein = parseFloat(macrosChart?.average?.protein) || 178;
   const avgSteps = parseFloat(stepsChart?.average) || 11462;
-  const yesterdaySteps = parseFloat(macros.steps.replace(/[^0-9.]/g, '')) || 0;
+  const yesterdaySteps = parseFloat(macros.steps?.replace(/[^0-9.]/g, '') || 0);
 
-  // Ensure title exists
-  if (!todaysWorkout.title) {
-    console.error("Error: todaysWorkout.title is missing:", todaysWorkout);
-    todaysWorkout.title = "Rest Day"; // Fallback title
-  }
   const workoutSplit = todaysWorkout.title.replace('CoachGPT – ', '') || 'workout';
 
   // Step count feedback
@@ -275,7 +276,7 @@ function generateHtmlSummary(
   console.log(`Final formatted values - Calories: ${formatNumber(macroValues.calories)}, Steps: ${formatNumber(macroValues.steps)}`);
 
   return `
-    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1:6;">
       <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
       <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
 
