@@ -109,12 +109,15 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
  * @param {number|string} num - The number to format.
  * @returns {string} - Formatted number with commas or 'N/A'.
  */
+/**
+ * Formats numbers with commas for readability (e.g., 8928 -> 8,928) or returns N/A for invalid input.
+ * @param {number|string} num - The number to format.
+ * @returns {string} - Formatted number with commas or 'N/A'.
+ */
 function formatNumber(num) {
-  // Log the input for debugging
   console.log(`Formatting number: ${num} (type: ${typeof num})`);
-  
-  // Convert to number and check if valid
-  const parsedNum = parseFloat(num);
+  const cleanedNum = typeof num === 'string' ? num.replace(/[^0-9.]/g, '') : num;
+  const parsedNum = parseFloat(cleanedNum);
   if (Number.isFinite(parsedNum)) {
     return parsedNum.toLocaleString('en-US');
   }
@@ -131,14 +134,15 @@ function estimateCalories(macros) {
   const protein = parseFloat(macros.protein) || 0;
   const carbs = parseFloat(macros.carbs) || 0;
   const fat = parseFloat(macros.fat) || 0;
-  const providedCalories = parseFloat(macros.calories) || 0;
+  // Remove commas from calories string before parsing
+  const providedCaloriesStr = macros.calories ? String(macros.calories).replace(/[^0-9.]/g, '') : '0';
+  const providedCalories = parseFloat(providedCaloriesStr) || 0;
   const estimatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
   
-  // Log for debugging
   console.log(`Provided calories: ${providedCalories}, Estimated: ${estimatedCalories}`);
   
-  // Only estimate if provided calories are significantly off (e.g., > 50 kcal difference)
-  if (Math.abs(providedCalories - estimatedCalories) > 50 && providedCalories < 500) {
+  // Only estimate if provided calories are truly invalid (e.g., 0 or undefined)
+  if (providedCalories === 0) {
     console.log(`Using estimated calories: ${estimatedCalories}`);
     return estimatedCalories;
   }
@@ -273,7 +277,6 @@ function generateHtmlSummary(
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
   const userName = process.env.EMAIL_USER || 'there';
 
-  // Calculate weight change
   const weightChange = (() => {
     const validWeights = allMacrosData
       .map(m => parseFloat(m.weight))
@@ -284,7 +287,6 @@ function generateHtmlSummary(
     return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—keep it up!`;
   })();
 
-  // Format yesterday's workout
   const workoutBlock = workouts.length > 0 ? workouts.map(w => `
     <h4 style="color: #333; font-size: 18px;">${w.title}</h4>
     ${formatWorkoutForEmail(w)}
@@ -292,7 +294,6 @@ function generateHtmlSummary(
 
   const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart);
 
-  // Log macros for debugging
   console.log(`Macros data: ${JSON.stringify(macros)}`);
 
   const macroValues = {
@@ -304,6 +305,9 @@ function generateHtmlSummary(
     steps: macros.steps || 'N/A'
   };
   const yesterdayCalories = estimateCalories(macros);
+
+  // Debug the final formatted values before rendering
+  console.log(`Final formatted values - Calories: ${formatNumber(macroValues.calories)}, Steps: ${formatNumber(macroValues.steps)}`);
 
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
