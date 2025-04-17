@@ -16,7 +16,7 @@ const { EMAIL_USER } = process.env;
 
 async function runDailySync() {
   try {
-    console.log("🔁 Running daily sync...");
+    console.log("🔁 Running daily sync... [runDailySync.js]");
 
     await fetchAllExercises();
     await fetchAllWorkouts();
@@ -28,6 +28,7 @@ async function runDailySync() {
 
     const autoplanResult = await autoplan({ workouts, templates, routines });
     const todaysWorkout = autoplanResult.routine.routine[0];
+    console.log('todaysWorkout after autoplan in runDailySync.js:', JSON.stringify(todaysWorkout));
 
     const recentWorkouts = await getYesterdaysWorkouts();
     const macros = await getMacrosFromSheet();
@@ -86,7 +87,7 @@ async function runDailySync() {
 
     console.log("✅ Daily summary sent!");
   } catch (err) {
-    console.error("❌ Daily sync failed:", err.message || err);
+    console.error("❌ runDailySync.js - Daily sync failed:", err.message || err);
   }
 }
 

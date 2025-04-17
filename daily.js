@@ -12,10 +12,9 @@ const generateEmail = require('./generateEmail');
 const { getMacrosFromSheet } = require('./sheetsService');
 const generateHtmlSummary = require('./generateEmail');
 
-
 async function runDailySync() {
   try {
-    console.log('🔁 Running daily sync...');
+    console.log('🔁 Running daily sync... [daily.js]');
 
     // Step 1: Refresh all cache files
     const workouts = await fetchRecentWorkouts();
@@ -29,7 +28,9 @@ async function runDailySync() {
     
     // Step 2: Build new routine
     const routineResult = await autoplan({ workouts, templates, routines });
-    const todaysWorkout = routineResult?.routine?.exercises || [];
+    // Use the full routine object, not just exercises
+    const todaysWorkout = routineResult?.routine || { title: 'Rest Day', exercises: [] };
+    console.log('todaysWorkout after autoplan in daily.js:', JSON.stringify(todaysWorkout));
 
     // Step 3: Load yesterday's workout if available
     const yesterdayWorkout = lastWorkout || { title: 'No workout found', exercises: [] };
@@ -41,10 +42,10 @@ async function runDailySync() {
       protein: Number(macroRow?.protein || 0),
       fat: Number(macroRow?.fat || 0),
       carbs: Number(macroRow?.carbs || 0),
-      calories: Number(macroRow?.calories || 0)
+      calories: Number(macroRow?.calories || 0),
+      weight: Number(macroRow?.weight || 0), // Added missing fields
+      steps: Number(macroRow?.steps || 0)
     };
-    const weight = Number(macroRow?.weight || 0);
-    const steps = Number(macroRow?.steps || 0);
 
     // Step 5: Generate and send email
     const charts = {}; // ⏳ Placeholder if charts aren't implemented yet
@@ -56,16 +57,15 @@ async function runDailySync() {
       trainerInsights,
       "TBD", // todayTargetDay (can be split name like "Pull" later)
       charts,
-      { exercises: todaysWorkout }, // today’s planned workout
+      todaysWorkout, // Pass the full routine object
       quoteText
     );
-    
 
     await sendEmail('🎯 Hevy Daily Summary', emailBody);
 
     console.log('✅ Daily summary sent!');
   } catch (err) {
-    console.error('❌ Daily sync failed:', err.message);
+    console.error('❌ Daily.js - Daily sync failed:', err.message);
   }
 }
 
