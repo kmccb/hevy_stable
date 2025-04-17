@@ -52,46 +52,92 @@ function formatWorkoutForEmail(workout) {
  * @param {Object} macrosChart - Average macro trends.
  * @returns {string} - HTML string of tailored tips.
  */
-function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
-  const tips = [];
+function generateHtmlSummary(
+  workouts,
+  macros,
+  allMacrosData,
+  trainerInsights,
+  todayTargetDay,
+  charts,
+  todaysWorkout,
+  quoteText
+) {
+  const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
+  const userName = process.env.EMAIL_USER || 'there';
+
+  const weightChange = (() => {
+    const validWeights = allMacrosData
+      .map(m => parseFloat(m.weight))
+      .filter(w => !isNaN(w));
+    if (validWeights.length < 2) return null;
+    const delta = validWeights.at(-1) - validWeights[0];
+    const direction = delta < 0 ? "dropped" : "gained";
+    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—keep it up!`;
+  })();
+
+  const workoutBlock = workouts.length > 0 ? workouts.map(w => `
+    <h4 style="color: #333; font-size: 18px;">${w.title}</h4>
+    ${formatWorkoutForEmail(w)}
+  `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
+
+  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout);
+
+  console.log(`Macros data: ${JSON.stringify(macros)}`);
+
+  const macroValues = {
+    calories: estimateCalories(macros),
+    protein: macros.protein || 'N/A',
+    carbs: macros.carbs || 'N/A',
+    fat: macros.fat || 'N/A',
+    weight: macros.weight || 'N/A',
+    steps: macros.steps || 'N/A'
+  };
   const yesterdayCalories = estimateCalories(macros);
-  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
-  const avgProtein = parseFloat(macrosChart?.average?.protein) || 178;
-  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 166;
-  const avgFat = parseFloat(macrosChart?.average?.fat) || 45;
 
-  if (!workouts.length) {
-    tips.push(`Looks like a rest day yesterday. Your ${formatNumber(macros.steps)} steps kept you active on a rest day—great job! With protein at ${formatNumber(macros.protein)}g, you’re set for today’s Pull + Abs. Try a 5-min dynamic stretch (like leg swings) to prep your lats for Chin Ups. Feeling refreshed or tired after yesterday? Reply to tweak intensity.`);
-  }
+  return `
+    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
+      <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
+      <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
 
-  const exerciseStats = {};
-  workouts.forEach(w => {
-    w.exercises.forEach(ex => {
-      const title = ex.title.toLowerCase();
-      if (!exerciseStats[title]) exerciseStats[title] = { maxReps: 0, maxWeight: 0, maxDuration: 0 };
-      ex.sets.forEach(s => {
-        if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
-        if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
-          exerciseStats[title].maxWeight = (s.weight_kg * 2.20462).toFixed(1);
-        }
-        if (s.duration_seconds && s.duration_seconds > exerciseStats[title].maxDuration) {
-          exerciseStats[title].maxDuration = s.duration_seconds;
-        }
-      });
-    });
-  });
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
+      ${workoutBlock}
 
-  if (exerciseStats['push up']) {
-    tips.push(`• <strong>Chin Up</strong>: Your bodyweight Chin Ups are looking strong—aim for 8-10 clean reps today, building on your ${exerciseStats['push up'].maxReps}-rep Push Up capacity.`);
-  }
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
+      <p>Here's how you fueled up yesterday:</p>
+      <ul style="list-style-type: disc; padding-left: 20px;">
+        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
+        <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
+        <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
+        <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
+        <li><strong>Weight</strong>: ${formatNumber(macroValues.weight)} lbs ${weightChange ? `(${weightChange})` : ""}</li>
+        <li><strong>Steps</strong>: ${formatNumber(macroValues.steps)}</li>
+      </ul>
 
-  if (yesterdayCalories < avgCalories - 200) {
-    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
-  } else if (yesterdayCalories > avgCalories + 200) {
-    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
-  }
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
+      <p>Check out these trends to see how far you've come:</p>
+      <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
+      <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
+      <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
+      <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
+      <p><strong>Macros</strong>: Protein ${formatNumber(macrosChart?.average?.protein)}g, Carbs ${formatNumber(macrosChart?.average?.carbs)}g, Fat ${formatNumber(macrosChart?.average?.fat)}g</p>
+      <img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">
+      <p><strong>Calories</strong>: Averaging ${formatNumber(calorieChart?.average)} kcal/day</p>
+      <img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">
 
-  return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
+      <p>${coachTips}</p>
+      <hr style="border: 1px solid #eee; margin: 20px 0;">
+
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Today’s Workout Plan</h3>
+      ${formatWorkoutForEmail(todaysWorkout)}
+
+      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">A Little Inspiration</h3>
+      <p style="font-style: italic; color: #555;">"${quoteText}"</p>
+      <p style="font-size: 16px;">You’ve got this! Keep pushing, and I’m here cheering you on.</p>
+      <p style="font-size: 14px; color: #666;">Got feedback? Let me know: <a href="https://forms.gle/yourformlink">here</a></p>
+      <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
+    </div>
+  `;
 }
 
 /**
