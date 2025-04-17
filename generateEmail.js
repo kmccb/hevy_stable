@@ -254,6 +254,18 @@ function generateHtmlSummary(
 
   console.log("todaysWorkout in generateHtmlSummary (before coachTips):", JSON.stringify(todaysWorkout));
 
+  // Guard against invalid todaysWorkout
+  if (!todaysWorkout || typeof todaysWorkout !== 'object' || !todaysWorkout.title || !todaysWorkout.exercises) {
+    console.error("Error: todaysWorkout is invalid in generateHtmlSummary:", todaysWorkout);
+    return `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1:6;">
+        <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
+        <p style="font-size: 16px;">Looks like we couldn't plan a workout for today—let's focus on recovery!</p>
+        <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
+      </div>
+    `;
+  }
+
   const weightChange = (() => {
     const validWeights = allMacrosData
       .map(m => parseFloat(m.weight))
@@ -269,7 +281,6 @@ function generateHtmlSummary(
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  // Simulate user feedback for now
   const userFeedback = "refreshed";
   const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback);
 

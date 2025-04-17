@@ -14,7 +14,7 @@ const { analyzeWorkouts } = require("./trainerUtils");
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.4 – Added completion log");
+console.log("🏷️ runDailySync.js Version: v1.5 – Strengthened todaysWorkout validation");
 
 // Log environment variables (mask password for security)
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
@@ -40,22 +40,30 @@ async function runDailySync(isCachePriming = false) {
 
     // Ensure todaysWorkout has a title and exercises
     let todaysWorkout = autoplanResult?.routine?.routine?.[0];
-    if (!todaysWorkout || typeof todaysWorkout !== 'object') {
-      console.warn("Warning: todaysWorkout is invalid after autoplan. Using fallback.");
-      todaysWorkout = { title: "Rest Day", exercises: [] };
-    } else if (!todaysWorkout.title) {
-      console.warn("Warning: todaysWorkout is missing a title. Adding fallback title.");
+    console.log('Raw todaysWorkout from autoplanResult:', JSON.stringify(todaysWorkout));
+
+    // Strengthened validation
+    if (!todaysWorkout || typeof todaysWorkout !== 'object' || !todaysWorkout.id) {
+      console.warn("Warning: todaysWorkout is invalid after autoplan (missing object or id). Using fallback.");
+      todaysWorkout = { title: "Rest Day", exercises: [], id: "fallback-id" };
+    }
+    if (!todaysWorkout.title || typeof todaysWorkout.title !== 'string') {
+      console.warn("Warning: todaysWorkout is missing a valid title. Adding fallback title.");
       todaysWorkout.title = "CoachGPT – Planned Workout";
     }
-    console.log('todaysWorkout after autoplan in runDailySync.js:', JSON.stringify(todaysWorkout));
+    if (!todaysWorkout.exercises || !Array.isArray(todaysWorkout.exercises)) {
+      console.warn("Warning: todaysWorkout is missing exercises array. Adding empty array.");
+      todaysWorkout.exercises = [];
+    }
+    console.log('Validated todaysWorkout in runDailySync.js:', JSON.stringify(todaysWorkout));
 
     // Skip email generation during cache priming or if todaysWorkout is invalid
     if (isCachePriming) {
-      console.log("Skipping email generation during cache priming.");
+      console.log(" skipping email generation during cache priming.");
       return;
     }
 
-    if (!todaysWorkout.title || !todaysWorkout.exercises?.length) {
+    if (!todaysWorkout.title || todaysWorkout.exercises.length === 0) {
       console.warn("Skipping email generation: todaysWorkout is not fully populated:", JSON.stringify(todaysWorkout));
       return;
     }
