@@ -115,9 +115,9 @@ function getExerciseTrend(workouts, exerciseTitle) {
   const first = exerciseData[0];
   const last = exerciseData[exerciseData.length - 1];
   if (first.maxWeight > 0 && last.maxWeight > first.maxWeight) {
-    return `You’ve increased from ${first.maxWeight.toFixed(1)} lbs to ${last.maxWeight.toFixed(1)} lbs on ${exerciseTitle} over the last 2 weeks—nice work! 📈`;
+    return `You’ve increased from ${first.maxWeight.toFixed(1)} lbs to ${last.maxWeight.toFixed(1)} lbs on ${exerciseTitle} over the last 2 weeks—awesome progress! Aim for a small increase today.`;
   } else if (first.maxReps > 0 && last.maxReps > first.maxReps) {
-    return `You’ve increased from ${first.maxReps} reps to ${last.maxReps} reps on ${exerciseTitle} over the last 2 weeks—nice work! 📈`;
+    return `You’ve increased from ${first.maxReps} to ${last.maxReps} reps on ${exerciseTitle} over the last 2 weeks—awesome progress! Aim for ${last.maxReps + 2} today.`;
   }
   return "";
 }
@@ -133,7 +133,7 @@ function getExerciseTrend(workouts, exerciseTitle) {
  * @param {Object} todaysWorkout - Today's planned workout.
  * @returns {string} - HTML string of tailored tips.
  */
-function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout) {
+function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback = "refreshed") {
   const tips = [];
   const yesterdayCalories = estimateCalories(macros);
   const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
@@ -142,40 +142,63 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   const yesterdaySteps = parseFloat(macros.steps.replace(/[^0-9.]/g, '')) || 0;
   const workoutSplit = todaysWorkout?.title?.replace('CoachGPT – ', '') || 'workout';
 
+  // Step count feedback
   if (!workouts.length) {
     const stepsThreshold = avgSteps * 0.8;
     const stepsMessage = yesterdaySteps >= stepsThreshold
       ? `Your ${formatNumber(yesterdaySteps)} steps kept you active on a rest day—nice work!`
       : `Your ${formatNumber(yesterdaySteps)} steps yesterday were a bit low compared to your ${formatNumber(avgSteps)} average—try adding a short walk today to stay on track.`;
     
-    tips.push(`${stepsMessage} With protein at ${formatNumber(macros.protein)}g, you’re set for today’s ${workoutSplit}. Try a 5-min dynamic stretch (like arm circles) to prep for today’s session. Feeling refreshed or tired after yesterday? Reply to tweak intensity.`);
+    // Dynamic prep suggestion based on workout split
+    let prepSuggestion = "Try a 5-min dynamic stretch (like arm circles) to prep for today’s session.";
+    if (workoutSplit.toLowerCase().includes("pull")) {
+      prepSuggestion = "Try a 5-min dynamic stretch with cat-cow stretches to mobilize your spine for Dragon Flags.";
+    } else if (workoutSplit.toLowerCase().includes("push")) {
+      prepSuggestion = "Try a 5-min dynamic stretch with shoulder rotations to prep your chest and shoulders for pressing.";
+    } else if (workoutSplit.toLowerCase().includes("legs")) {
+      prepSuggestion = "Try a 5-min dynamic stretch with leg swings to prep your hips and quads for squatting.";
+    }
+
+    // Base tip with steps, protein, and prep
+    tips.push(`${stepsMessage} With protein at ${formatNumber(macros.protein)}g, you’re set for today’s ${workoutSplit}. ${prepSuggestion}`);
   }
 
-  const exerciseStats = {};
-  workouts.forEach(w => {
-    w.exercises.forEach(ex => {
-      const title = ex.title.toLowerCase();
-      if (!exerciseStats[title]) exerciseStats[title] = { maxReps: 0, maxWeight: 0, maxDuration: 0 };
-      ex.sets.forEach(s => {
-        if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
-        if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
-          exerciseStats[title].maxWeight = (s.weight_kg * 2.20462).toFixed(1);
-        }
-        if (s.duration_seconds && s.duration_seconds > exerciseStats[title].maxDuration) {
-          exerciseStats[title].maxDuration = s.duration_seconds;
-        }
-      });
-    });
-  });
-
-  if (exerciseStats['push up']) {
-    tips.push(`• <strong>Chin Up</strong>: Your bodyweight Chin Ups are looking strong—aim for 8-10 clean reps today, building on your ${exerciseStats['push up'].maxReps}-rep Push Up capacity.`);
+  // Add progression insight for the first exercise in today's workout
+  if (todaysWorkout?.exercises?.length) {
+    const firstExercise = todaysWorkout.exercises[0].title;
+    const trend = getExerciseTrend(allMacrosData, firstExercise);
+    if (trend) {
+      tips.push(`• <strong>${firstExercise}</strong>: ${trend}`);
+    }
   }
 
+  // Adjust tone based on user feedback
+  const intensityTip = userFeedback.toLowerCase() === "refreshed"
+    ? `Glad you’re feeling refreshed—let’s push for 10 Chin Up reps today to keep building strength!`
+    : `Feeling tired? Let’s focus on form with 6-8 Chin Up reps today to maintain your progress.`;
+  tips.push(intensityTip);
+
+  // Tie to long-term goal (assumed: maintain weight loss, build strength)
+  const weightChange = allMacrosData.length >= 2
+    ? (parseFloat(allMacrosData[allMacrosData.length - 1].weight) - parseFloat(allMacrosData[0].weight)).toFixed(1)
+    : 0;
+  if (weightChange !== 0) {
+    const goalMessage = weightChange < 0
+      ? `Your ${workoutSplit} session today is perfect for building upper body strength while keeping your calorie burn on track—nice balance with your ${Math.abs(weightChange)} lb loss!`
+      : `Your ${workoutSplit} session today is great for building strength—keep up the consistency to support your ${Math.abs(weightChange)} lb gain!`;
+    tips.push(goalMessage);
+  }
+
+  // Calorie-based tips
   if (yesterdayCalories < avgCalories - 200) {
     tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
   } else if (yesterdayCalories > avgCalories + 200) {
     tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
+  }
+
+  // Add feedback prompt if no prior feedback
+  if (!userFeedback) {
+    tips.push(`Feeling refreshed or tired after yesterday? Reply to tweak intensity.`);
   }
 
   return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
@@ -212,7 +235,9 @@ function generateHtmlSummary(
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout);
+  // Simulate user feedback for now (replace with actual reply mechanism later)
+  const userFeedback = "refreshed"; // Hardcoded for now; ideally fetched from user reply
+  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback);
 
   console.log(`Macros data: ${JSON.stringify(macros)}`);
 
@@ -273,5 +298,6 @@ function generateHtmlSummary(
     </div>
   `;
 }
+
 
 module.exports = generateHtmlSummary;
