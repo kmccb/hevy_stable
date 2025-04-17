@@ -110,7 +110,16 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
  * @returns {string} - Formatted number with commas or 'N/A'.
  */
 function formatNumber(num) {
-  return Number.isFinite(parseFloat(num)) ? parseFloat(num).toLocaleString('en-US') : 'N/A';
+  // Log the input for debugging
+  console.log(`Formatting number: ${num} (type: ${typeof num})`);
+  
+  // Convert to number and check if valid
+  const parsedNum = parseFloat(num);
+  if (Number.isFinite(parsedNum)) {
+    return parsedNum.toLocaleString('en-US');
+  }
+  console.log(`Invalid number detected: ${num}`);
+  return 'N/A';
 }
 
 /**
@@ -124,9 +133,17 @@ function estimateCalories(macros) {
   const fat = parseFloat(macros.fat) || 0;
   const providedCalories = parseFloat(macros.calories) || 0;
   const estimatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
-  return providedCalories < 500 && estimatedCalories > 500 ? estimatedCalories : providedCalories;
+  
+  // Log for debugging
+  console.log(`Provided calories: ${providedCalories}, Estimated: ${estimatedCalories}`);
+  
+  // Only estimate if provided calories are significantly off (e.g., > 50 kcal difference)
+  if (Math.abs(providedCalories - estimatedCalories) > 50 && providedCalories < 500) {
+    console.log(`Using estimated calories: ${estimatedCalories}`);
+    return estimatedCalories;
+  }
+  return providedCalories;
 }
-
 /**
  * Formats a date string to MM-DD-YYYY format.
  * @param {string|Date} date - The date to format.
@@ -240,6 +257,9 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
 }
 
+/**
+ * Generates HTML summary for the daily email.
+ */
 function generateHtmlSummary(
   workouts,
   macros,
@@ -253,7 +273,7 @@ function generateHtmlSummary(
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
   const userName = process.env.EMAIL_USER || 'there';
 
-  // Calculate weight change for a personal touch
+  // Calculate weight change
   const weightChange = (() => {
     const validWeights = allMacrosData
       .map(m => parseFloat(m.weight))
@@ -264,16 +284,17 @@ function generateHtmlSummary(
     return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—keep it up!`;
   })();
 
-  // Format yesterday's workout with a friendly intro
+  // Format yesterday's workout
   const workoutBlock = workouts.length > 0 ? workouts.map(w => `
     <h4 style="color: #333; font-size: 18px;">${w.title}</h4>
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  // Enhanced and personalized coach tips
   const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart);
 
-  // Handle missing macros data with N/A and estimate calories
+  // Log macros for debugging
+  console.log(`Macros data: ${JSON.stringify(macros)}`);
+
   const macroValues = {
     calories: estimateCalories(macros),
     protein: macros.protein || 'N/A',
