@@ -23,7 +23,6 @@ function formatWorkoutForEmail(workout) {
       if (s.duration_seconds) {
         return `${s.duration_seconds}s hold`;
       } else if (s.weight_kg != null && s.reps != null) {
-        // Special case for bodyweight exercises like Chin Up
         if (ex.title.toLowerCase().includes('chin up') && s.weight_kg === 0) {
           return `Bodyweight x ${s.reps}`;
         }
@@ -44,7 +43,6 @@ function formatWorkoutForEmail(workout) {
     </ul>
   `;
 }
-
 /**
  * Generates personalized coach tips based on workout and macro history.
  * @param {Array} trainerInsights - Array of insight objects with exercise data.
@@ -57,13 +55,13 @@ function formatWorkoutForEmail(workout) {
 function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
   const tips = [];
   const yesterdayCalories = estimateCalories(macros);
-  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791;
-  const avgProtein = parseFloat(macrosChart?.average?.protein) || 170;
-  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 135;
-  const avgFat = parseFloat(macrosChart?.average?.fat) || 60;
+  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
+  const avgProtein = parseFloat(macrosChart?.average?.protein) || 178;
+  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 166;
+  const avgFat = parseFloat(macrosChart?.average?.fat) || 45;
 
   if (!workouts.length) {
-    tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery! How did you feel after yesterday’s rest? Reply with ‘refreshed’ or ‘tired’ to tweak today’s intensity.");
+    tips.push(`Looks like a rest day yesterday. Your ${formatNumber(macros.steps)} steps kept you active on a rest day—great job! With protein at ${formatNumber(macros.protein)}g, you’re set for today’s Pull + Abs. Try a 5-min dynamic stretch (like leg swings) to prep your lats for Chin Ups. Feeling refreshed or tired after yesterday? Reply to tweak intensity.`);
   }
 
   const exerciseStats = {};
@@ -83,22 +81,14 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     });
   });
 
-  // Add progression feedback for relevant exercises
   if (exerciseStats['push up']) {
-    tips.push(`• <strong>Chin Up</strong>: You’ve hit ${exerciseStats['push up'].maxReps} reps on Push Up—let’s aim for 8-10 clean Chin Up reps today with bodyweight.`);
-  }
-  if (exerciseStats['plank']) {
-    tips.push(`• <strong>Plank</strong>: Your Plank held steady at ${exerciseStats['plank'].maxDuration}s recently—nice! We’re bumping it to 80s today to keep the progress going.`);
+    tips.push(`• <strong>Chin Up</strong>: Your bodyweight Chin Ups are looking strong—aim for 8-10 clean reps today, building on your ${exerciseStats['push up'].maxReps}-rep Push Up capacity.`);
   }
 
   if (yesterdayCalories < avgCalories - 200) {
     tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
   } else if (yesterdayCalories > avgCalories + 200) {
     tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
-  }
-
-  if (parseFloat(macros.protein) < avgProtein * 0.8) {
-    tips.push(`• Protein was ${formatNumber(macros.protein)}g yesterday—boost it toward your ${formatNumber(avgProtein)}g average with chicken or eggs to support muscle growth.`);
   }
 
   return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
@@ -203,63 +193,7 @@ function getExerciseTrend(workouts, exerciseTitle) {
  * @param {Object} macrosChart - Average macro trends.
  * @returns {string} - HTML string of tailored tips.
  */
-function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
-  const tips = [];
-  const yesterdayCalories = estimateCalories(macros);
-  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791;
-  const avgProtein = parseFloat(macrosChart?.average?.protein) || 170;
-  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 135;
-  const avgFat = parseFloat(macrosChart?.average?.fat) || 60;
 
-  if (!workouts.length) {
-    tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery! How did you feel after yesterday’s rest? Reply with ‘refreshed’ or ‘tired’ to tweak today’s intensity.");
-  }
-
-  const exerciseStats = {};
-  workouts.forEach(w => {
-    w.exercises.forEach(ex => {
-      const title = ex.title.toLowerCase();
-      if (!exerciseStats[title]) exerciseStats[title] = { maxReps: 0, maxWeight: 0 };
-      ex.sets.forEach(s => {
-        if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
-        if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
-          exerciseStats[title].maxWeight = (s.weight_kg * 2.20462).toFixed(1);
-        }
-      });
-    });
-  });
-
-  Object.keys(exerciseStats).forEach(title => {
-    let tip = `• <strong>${title.charAt(0).toUpperCase() + title.slice(1)}</strong>: `;
-    if (title.includes('incline bench press')) {
-      tip += `You’ve been hitting 12 reps at 80 lbs lately—let’s carry that strength into today’s workout. `;
-    }
-    if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight > 0) {
-      const weightIncrease = Math.min(5, parseFloat(exerciseStats[title].maxWeight) * 0.05);
-      const newWeight = (parseFloat(exerciseStats[title].maxWeight) + weightIncrease).toFixed(1);
-      const newReps = exerciseStats[title].maxReps + 1;
-      const effort = exerciseStats[title].maxReps >= 10 ? "manageable" : "challenging";
-      if (title.includes('incline bench press')) {
-        tip += `You lifted ${exerciseStats[title].maxWeight} lbs (using two ${parseFloat(exerciseStats[title].maxWeight) / 2}lb dumbbells) for ${exerciseStats[title].maxReps} reps, which felt ${effort}—adjust today’s Chin Up to ${newWeight / 2} lbs resistance if it’s machine-assisted.`;
-      } else {
-        tip += `You lifted ${exerciseStats[title].maxWeight} lbs for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
-      }
-      tip += ` Did this feel tough? Reply with 'easy' or 'hard' to adjust tomorrow’s plan.`;
-    }
-  });
-
-  if (yesterdayCalories < avgCalories - 200) {
-    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
-  } else if (yesterdayCalories > avgCalories + 200) {
-    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
-  }
-
-  if (parseFloat(macros.protein) < avgProtein * 0.8) {
-    tips.push(`• Protein was ${formatNumber(macros.protein)}g yesterday—boost it toward your ${formatNumber(avgProtein)}g average with chicken or eggs to support muscle growth.`);
-  }
-
-  return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
-}
 
 /**
  * Generates HTML summary for the daily email.
