@@ -131,6 +131,7 @@ function getExerciseTrend(workouts, exerciseTitle) {
  * @param {Object} macrosChart - Average macro trends.
  * @param {Object} stepsChart - Average step trends.
  * @param {Object} todaysWorkout - Today's planned workout.
+ * @param {string} userFeedback - User's feedback on how they're feeling (e.g., "refreshed" or "tired").
  * @returns {string} - HTML string of tailored tips.
  */
 function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback = "refreshed") {
@@ -140,6 +141,11 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   const avgProtein = parseFloat(macrosChart?.average?.protein) || 178;
   const avgSteps = parseFloat(stepsChart?.average) || 11462;
   const yesterdaySteps = parseFloat(macros.steps.replace(/[^0-9.]/g, '')) || 0;
+
+  // Defensive check for todaysWorkout
+  if (!todaysWorkout) {
+    console.log("Error: todaysWorkout is undefined or null in generateCoachTips");
+  }
   const workoutSplit = todaysWorkout?.title?.replace('CoachGPT – ', '') || 'workout';
 
   // Step count feedback
@@ -170,6 +176,8 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     if (trend) {
       tips.push(`• <strong>${firstExercise}</strong>: ${trend}`);
     }
+  } else {
+    console.log("No exercises found in todaysWorkout:", todaysWorkout);
   }
 
   // Adjust tone based on user feedback
@@ -220,6 +228,9 @@ function generateHtmlSummary(
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
   const userName = process.env.EMAIL_USER || 'there';
 
+  // Log todaysWorkout to diagnose the issue
+  console.log("todaysWorkout in generateHtmlSummary:", JSON.stringify(todaysWorkout));
+
   const weightChange = (() => {
     const validWeights = allMacrosData
       .map(m => parseFloat(m.weight))
@@ -235,8 +246,8 @@ function generateHtmlSummary(
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  // Simulate user feedback for now (replace with actual reply mechanism later)
-  const userFeedback = "refreshed"; // Hardcoded for now; ideally fetched from user reply
+  // Simulate user feedback for now
+  const userFeedback = "refreshed";
   const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback);
 
   console.log(`Macros data: ${JSON.stringify(macros)}`);
@@ -298,6 +309,5 @@ function generateHtmlSummary(
     </div>
   `;
 }
-
 
 module.exports = generateHtmlSummary;
