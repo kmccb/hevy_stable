@@ -22,8 +22,9 @@ async function runDailySync() {
     const trends = analyzeLongTermTrends();
 
     const historyAnalysis = analyzeHistory(workouts);
+    const trainerInsights = historyAnalysis.progressionAnalysis;
     const lastWorkout = workouts[0];
-
+    
     // Step 2: Build new routine
     const routineResult = await autoplan({ workouts, templates, routines });
     const todaysWorkout = routineResult?.routine?.exercises || [];
@@ -44,7 +45,16 @@ async function runDailySync() {
     const steps = Number(macroRow?.steps || 0);
 
     // Step 5: Generate and send email
-    const emailBody = generateEmail({ macros, weight, steps, yesterdayWorkout, todaysWorkout });
+const emailBody = generateEmail({
+  macros,
+  weight,
+  steps,
+  yesterdayWorkout,
+  todaysWorkout,
+  trainerInsights,
+  workouts, // recent 30 days – used in coach tips
+});
+
     await sendEmail('🎯 Hevy Daily Summary', emailBody);
 
     console.log('✅ Daily summary sent!');
