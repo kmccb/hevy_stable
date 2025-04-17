@@ -74,6 +74,37 @@ function formatDate(date) {
 }
 
 /**
+ * Calculates progression trend for an exercise over the last 14 days.
+ * @param {Array} workouts - Array of workout objects.
+ * @param {string} exerciseTitle - The title of the exercise.
+ * @returns {string} - A string summarizing the trend.
+ */
+function getExerciseTrend(workouts, exerciseTitle) {
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  const relevantWorkouts = workouts.filter(w => new Date(w.date) >= twoWeeksAgo);
+  const exerciseData = relevantWorkouts
+    .flatMap(w => w.exercises)
+    .filter(e => e.title.toLowerCase() === exerciseTitle.toLowerCase())
+    .map(e => ({
+      date: new Date(w.date),
+      maxWeight: Math.max(...e.sets.map(s => (s.weight_kg || 0) * 2.20462)),
+      maxReps: Math.max(...e.sets.map(s => s.reps || 0))
+    }))
+    .sort((a, b) => a.date - b.date);
+
+  if (exerciseData.length < 2) return "";
+  const first = exerciseData[0];
+  const last = exerciseData[exerciseData.length - 1];
+  if (first.maxWeight > 0 && last.maxWeight > first.maxWeight) {
+    return `You’ve increased from ${first.maxWeight.toFixed(1)} lbs to ${last.maxWeight.toFixed(1)} lbs on ${exerciseTitle} over the last 2 weeks—nice work! 📈`;
+  } else if (first.maxReps > 0 && last.maxReps > first.maxReps) {
+    return `You’ve increased from ${first.maxReps} reps to ${last.maxReps} reps on ${exerciseTitle} over the last 2 weeks—nice work! 📈`;
+  }
+  return "";
+}
+
+/**
  * Generates personalized coach tips based on workout and macro history.
  * @param {Array} trainerInsights - Array of insight objects with exercise data.
  * @param {Array} workouts - Array of recent workout objects.
@@ -117,6 +148,10 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     const isDuration = title.includes('plank') || title.includes('hold') || title.includes('walking');
     let tip = `• <strong>${title.charAt(0).toUpperCase() + title.slice(1)}</strong>: `;
 
+    // Add progression trend
+    const trend = getExerciseTrend(workouts, title);
+    if (trend) tip += `${trend} `;
+
     if (isDuration && exerciseStats[title].maxReps === 0 && workouts.some(w => w.exercises.some(e => e.title.toLowerCase() === title && e.sets.some(s => s.duration_seconds)))) {
       const duration = Math.max(...workouts.flatMap(w => w.exercises.filter(e => e.title.toLowerCase() === title).flatMap(e => e.sets.map(s => s.duration_seconds || 0))).filter(d => d));
       const newDuration = duration + 5;
@@ -125,11 +160,17 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
       const newReps = exerciseStats[title].maxReps + 2;
       tip += `You hit ${exerciseStats[title].maxReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
     } else if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight > 0) {
-      const weightIncrease = Math.min(5, exerciseStats[title].maxWeight * 0.05);
+      const weightIncrease = Math.min(5, parseFloat(exerciseStats[title].maxWeight) * 0.05);
       const newWeight = Number.isFinite(exerciseStats[title].maxWeight) ? (parseFloat(exerciseStats[title].maxWeight) + weightIncrease).toFixed(1) : exerciseStats[title].maxWeight;
       const newReps = exerciseStats[title].maxReps + 1;
       const effort = exerciseStats[title].maxReps >= 10 ? "manageable" : "challenging";
-      tip += `You lifted ${exerciseStats[title].maxWeight} lbs for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
+      if (title.includes('incline bench press')) {
+        tip += `You lifted ${exerciseStats[title].maxWeight} lbs (using two ${parseFloat(exerciseStats[title].maxWeight) / 2}lb dumbbells) for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but ease off if the last set was tough.`;
+      } else {
+        tip += `You lifted ${exerciseStats[title].maxWeight} lbs for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
+      }
+      // Add feedback prompt for weighted exercises
+      tip += ` Did this feel tough? Reply with 'easy' or 'hard' to adjust tomorrow’s plan.`;
     } else {
       tip += `Your form’s solid—keep it consistent and we’ll add reps or weight when you’re ready.`;
     }
