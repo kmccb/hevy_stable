@@ -105,6 +105,7 @@ function getExerciseTrend(workouts, exerciseTitle) {
 }
 
 /**
+
  * Generates personalized coach tips based on workout and macro history.
  * @param {Array} trainerInsights - Array of insight objects with exercise data.
  * @param {Array} workouts - Array of recent workout objects.
@@ -116,24 +117,20 @@ function getExerciseTrend(workouts, exerciseTitle) {
 function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
   const tips = [];
   const yesterdayCalories = estimateCalories(macros);
-  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791; // Default to 1791 from PDF
-  const avgProtein = parseFloat(macrosChart?.average?.protein) || 170; // Default to 170g
-  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 135; // Default to 135g
-  const avgFat = parseFloat(macrosChart?.average?.fat) || 60; // Default to 60g
+  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791;
+  const avgProtein = parseFloat(macrosChart?.average?.protein) || 170;
+  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 135;
+  const avgFat = parseFloat(macrosChart?.average?.fat) || 60;
 
-  // Rest day advice if no workouts
   if (!workouts.length) {
-    tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery!");
+    tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery! How did you feel after yesterday’s rest? Reply with ‘refreshed’ or ‘tired’ to tweak today’s intensity.");
   }
 
-  // Get max performance from workouts
   const exerciseStats = {};
   workouts.forEach(w => {
     w.exercises.forEach(ex => {
       const title = ex.title.toLowerCase();
-      if (!exerciseStats[title]) {
-        exerciseStats[title] = { maxReps: 0, maxWeight: 0 };
-      }
+      if (!exerciseStats[title]) exerciseStats[title] = { maxReps: 0, maxWeight: 0 };
       ex.sets.forEach(s => {
         if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
         if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
@@ -143,47 +140,25 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     });
   });
 
-  // Workout-based tips with trainer reasoning
   Object.keys(exerciseStats).forEach(title => {
-    const isDuration = title.includes('plank') || title.includes('hold') || title.includes('walking');
     let tip = `• <strong>${title.charAt(0).toUpperCase() + title.slice(1)}</strong>: `;
-
-    // Add progression trend
-    const trend = getExerciseTrend(workouts, title);
-    if (trend) tip += `${trend} `;
-
-    if (isDuration && exerciseStats[title].maxReps === 0 && workouts.some(w => w.exercises.some(e => e.title.toLowerCase() === title && e.sets.some(s => s.duration_seconds)))) {
-      const duration = Math.max(...workouts.flatMap(w => w.exercises.filter(e => e.title.toLowerCase() === title).flatMap(e => e.sets.map(s => s.duration_seconds || 0))).filter(d => d));
-      const newDuration = duration + 5;
-      tip += `You held for ${duration}s consistently—try ${newDuration}s next time to push your endurance, but only if form stays solid.`;
-    } else if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight === 0) {
-      const newReps = exerciseStats[title].maxReps + 2;
-      tip += `You hit ${exerciseStats[title].maxReps} reps with good form—aim for ${newReps} if you felt strong, or stick with this to build consistency.`;
-    } else if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight > 0) {
+    if (title.includes('incline bench press')) {
+      tip += `You’ve been hitting 12 reps at 80 lbs lately—let’s carry that strength into today’s workout. `;
+    }
+    if (exerciseStats[title].maxReps > 0 && exerciseStats[title].maxWeight > 0) {
       const weightIncrease = Math.min(5, parseFloat(exerciseStats[title].maxWeight) * 0.05);
-      const newWeight = Number.isFinite(exerciseStats[title].maxWeight) ? (parseFloat(exerciseStats[title].maxWeight) + weightIncrease).toFixed(1) : exerciseStats[title].maxWeight;
+      const newWeight = (parseFloat(exerciseStats[title].maxWeight) + weightIncrease).toFixed(1);
       const newReps = exerciseStats[title].maxReps + 1;
       const effort = exerciseStats[title].maxReps >= 10 ? "manageable" : "challenging";
       if (title.includes('incline bench press')) {
-        tip += `You lifted ${exerciseStats[title].maxWeight} lbs (using two ${parseFloat(exerciseStats[title].maxWeight) / 2}lb dumbbells) for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but ease off if the last set was tough.`;
+        tip += `You lifted ${exerciseStats[title].maxWeight} lbs (using two ${parseFloat(exerciseStats[title].maxWeight) / 2}lb dumbbells) for ${exerciseStats[title].maxReps} reps, which felt ${effort}—adjust today’s Chin Up to ${newWeight / 2} lbs resistance if it’s machine-assisted.`;
       } else {
         tip += `You lifted ${exerciseStats[title].maxWeight} lbs for ${exerciseStats[title].maxReps} reps, which felt ${effort}—try ${newWeight} lbs or ${newReps} reps next time if your form held up, but focus on control over speed.`;
       }
-      // Add feedback prompt for weighted exercises
       tip += ` Did this feel tough? Reply with 'easy' or 'hard' to adjust tomorrow’s plan.`;
-    } else {
-      tip += `Your form’s solid—keep it consistent and we’ll add reps or weight when you’re ready.`;
     }
-
-    // Avoid lower back risk (from March 26 chat)
-    if (title.includes('deadlift')) {
-      tip += ` Let’s swap this for glute bridges to protect your back.`;
-    }
-
-    tips.push(tip);
   });
 
-  // Macro-based tips
   if (yesterdayCalories < avgCalories - 200) {
     tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
   } else if (yesterdayCalories > avgCalories + 200) {
