@@ -1,7 +1,21 @@
 /**
- * Builds the full HTML content for the daily summary email.
+ * Builds the full HTML content for the daily summary email and handles sending.
  * Includes workouts, macros, charts, feedback, and a motivational quote with a human, conversational tone.
  */
+
+const nodemailer = require('nodemailer');
+
+// Use environment variables directly
+const { EMAIL_USER, EMAIL_PASS } = process.env;
+
+// Create transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: EMAIL_USER,
+    pass: EMAIL_PASS
+  }
+});
 
 /**
  * Formats a workout object into HTML for display in the email.
@@ -236,7 +250,7 @@ function generateHtmlSummary(
   quoteText
 ) {
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
-  const userName = process.env.EMAIL_USER || 'there';
+  const userName = process.env.EMAIL_USER ? process.env.EMAIL_USER.split('@')[0] : 'there';
 
   console.log("todaysWorkout in generateHtmlSummary (before coachTips):", JSON.stringify(todaysWorkout));
 
@@ -321,4 +335,50 @@ function generateHtmlSummary(
   `;
 }
 
-module.exports = generateHtmlSummary;
+/**
+ * Generates and sends the daily email.
+ * @param {Array} workouts - Array of recent workout objects.
+ * @param {Object} macros - Current macros data.
+ * @param {Object} allMacrosData - Historical macros data.
+ * @param {Array} trainerInsights - Array of insight objects.
+ * @param {number} todayDayNumber - The current day number in the cycle.
+ * @param {Object} charts - Object containing chart buffers (weightChart, stepsChart, macrosChart, calorieChart).
+ * @param {Object} todaysWorkout - Today's planned workout.
+ * @param {string} quoteText - Motivational quote for the email.
+ */
+async function sendDailyEmail(workouts, macros, allMacrosData, trainerInsights, todayDayNumber, charts, todaysWorkout, quoteText) {
+  try {
+    console.log("✍️ Generating email HTML...");
+    const html = generateHtmlSummary(
+      workouts,
+      macros,
+      allMacrosData,
+      trainerInsights,
+      todayDayNumber,
+      charts,
+      todaysWorkout,
+      quoteText
+    );
+    console.log("✍️ Email HTML generated successfully");
+
+    console.log("📧 Sending email...");
+    await transporter.sendMail({
+      from: EMAIL_USER,
+      to: EMAIL_USER,
+      subject: `🎯 Hevy Daily Summary (${formatDate(macros.date)})`,
+      html,
+      attachments: [
+        { filename: "weight.png", content: charts.weightChart.buffer, cid: "weightChart" },
+        { filename: "steps.png", content: charts.stepsChart.buffer, cid: "stepsChart" },
+        { filename: "macros.png", content: charts.macrosChart.buffer, cid: "macrosChart" },
+        { filename: "calories.png", content: charts.calorieChart.buffer, cid: "caloriesChart" }
+      ]
+    });
+    console.log("✅ Daily summary sent!");
+  } catch (emailError) {
+    console.error("❌ Failed to send email:", emailError.message || emailError);
+    throw new Error(`Email sending failed: ${emailError.message}`);
+  }
+}
+
+module.exports = { generateHtmlSummary, sendDailyEmail };

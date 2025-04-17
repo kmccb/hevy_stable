@@ -8,27 +8,33 @@ const axios = require("axios");
 const { getYesterdaysWorkouts } = require("./getYesterdaysWorkouts");
 const { getMacrosFromSheet, getAllMacrosFromSheet } = require("./sheetsService");
 const { generateWeightChart, generateStepsChart, generateMacrosChart, generateCaloriesChart } = require("./chartService");
-const generateHtmlSummary = require("./generateEmail");
-const transporter = require("./transporter");
+const { sendDailyEmail } = require("./generateEmail");
 const { analyzeWorkouts } = require("./trainerUtils");
 
-const { EMAIL_USER } = process.env;
+const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.1 – Added isCachePriming logic");
+console.log("🏷️ runDailySync.js Version: v1.4 – Added completion log");
+
+// Log environment variables (mask password for security)
+console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
 
 async function runDailySync(isCachePriming = false) {
   try {
     console.log(`🔁 Running daily sync... [runDailySync.js] (isCachePriming: ${isCachePriming})`);
 
+    console.log("📂 Fetching cache data...");
     await fetchAllExercises();
     await fetchAllWorkouts();
     await fetchAllRoutines();
 
+    console.log("📂 Reading cache files...");
     const workouts = JSON.parse(fs.readFileSync("data/workouts-30days.json"));
     const templates = JSON.parse(fs.readFileSync("data/exercise_templates.json"));
     const routines = JSON.parse(fs.readFileSync("data/routines.json"));
+    console.log(`📂 Cache files read - Workouts: ${workouts.length}, Templates: ${templates.length}, Routines: ${routines.length}`);
 
+    console.log("⚙️ Running autoplan...");
     const autoplanResult = await autoplan({ workouts, templates, routines });
     console.log('autoplanResult in runDailySync.js:', JSON.stringify(autoplanResult));
 
@@ -54,38 +60,53 @@ async function runDailySync(isCachePriming = false) {
       return;
     }
 
+    console.log("📅 Fetching recent workouts...");
     const recentWorkouts = await getYesterdaysWorkouts();
+    console.log(`📅 Recent workouts fetched: ${recentWorkouts.length}`);
+
+    console.log("📊 Fetching macros...");
     const macros = await getMacrosFromSheet();
     if (!macros) throw new Error("No macros found for yesterday.");
+    console.log(`📊 Macros fetched: ${JSON.stringify(macros)}`);
 
+    console.log("📊 Fetching all macros...");
     const allMacros = await getAllMacrosFromSheet();
+    console.log(`📊 All macros fetched: ${allMacros.length} entries`);
 
+    console.log("📈 Generating charts...");
     const weightChart = await generateWeightChart(allMacros);
     const stepsChart = await generateStepsChart(allMacros);
     const macrosChart = await generateMacrosChart(allMacros);
     const calorieChart = await generateCaloriesChart(allMacros);
+    console.log("📈 Charts generated successfully");
 
+    console.log("🧠 Generating trainer insights...");
     const trainerInsights = recentWorkouts.length === 0 ? [] : analyzeWorkouts(recentWorkouts);
+    console.log(`🧠 Trainer insights generated: ${trainerInsights.length} insights`);
 
+    console.log("📅 Calculating day number...");
     const lastDay = recentWorkouts.find(w => w.title.includes("Day"))?.title.match(/Day (\d+)/);
     const todayDayNumber = lastDay ? parseInt(lastDay[1]) + 1 : 1;
+    console.log(`📅 Today day number: ${todayDayNumber}`);
 
-    // ✨ ZenQuotes Only
+    console.log("💬 Fetching quote...");
     let quoteText = "“You are stronger than you think.” – CoachGPT";
     try {
       const res = await axios.get('https://zenquotes.io/api/today');
       const quote = res.data[0];
       quoteText = `“${quote.q}” – ${quote.a}`;
+      console.log(`💬 Quote fetched: ${quoteText}`);
     } catch (err) {
       console.warn("❌ ZenQuote fetch failed, using fallback:", err.message);
     }
 
-    const html = generateHtmlSummary(
+    console.log("📧 Preparing to send daily email...");
+    await sendDailyEmail(
       recentWorkouts,
       macros,
       allMacros,
       trainerInsights,
-      todayDayNumber > 7 ? 1 : todayDayNumber,
+      todayDayNumber,
       {
         weightChart,
         stepsChart,
@@ -95,24 +116,12 @@ async function runDailySync(isCachePriming = false) {
       todaysWorkout,
       quoteText
     );
-
-    await transporter.sendMail({
-      from: EMAIL_USER,
-      to: EMAIL_USER,
-      subject: `🎯 Hevy Daily Summary (${macros.date})`,
-      html,
-      attachments: [
-        { filename: "weight.png", content: weightChart.buffer, cid: "weightChart" },
-        { filename: "steps.png", content: stepsChart.buffer, cid: "stepsChart" },
-        { filename: "macros.png", content: macrosChart.buffer, cid: "macrosChart" },
-        { filename: "calories.png", content: calorieChart.buffer, cid: "caloriesChart" }
-      ]
-    });
-
-    console.log("✅ Daily summary sent!");
+    console.log("📧 Daily email process completed.");
   } catch (err) {
     console.error("❌ runDailySync.js - Daily sync failed:", err.message || err);
     throw err; // Rethrow to ensure the error is visible in the caller
+  } finally {
+    console.log("🏁 runDailySync.js - Daily sync completed.");
   }
 }
 
