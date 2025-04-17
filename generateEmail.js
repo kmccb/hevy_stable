@@ -8,6 +8,11 @@
  * @param {Object} workout - A CoachGPT-generated workout object.
  * @returns {string} - HTML string of formatted workout.
  */
+/**
+ * Formats a workout object into HTML for display in the email.
+ * @param {Object} workout - A CoachGPT-generated workout object.
+ * @returns {string} - HTML string of formatted workout.
+ */
 function formatWorkoutForEmail(workout) {
   if (!workout || !workout.exercises?.length) {
     return "<p>Looks like no workout is planned today. Take it easy or sneak in some light movement!</p>";
@@ -18,6 +23,10 @@ function formatWorkoutForEmail(workout) {
       if (s.duration_seconds) {
         return `${s.duration_seconds}s hold`;
       } else if (s.weight_kg != null && s.reps != null) {
+        // Special case for bodyweight exercises like Chin Up
+        if (ex.title.toLowerCase().includes('chin up') && s.weight_kg === 0) {
+          return `Bodyweight x ${s.reps}`;
+        }
         return `${(s.weight_kg * 2.20462).toFixed(1)} lbs x ${s.reps}`;
       } else if (s.reps != null) {
         return `Bodyweight x ${s.reps}`;
@@ -34,6 +43,65 @@ function formatWorkoutForEmail(workout) {
       ${exerciseList}
     </ul>
   `;
+}
+
+/**
+ * Generates personalized coach tips based on workout and macro history.
+ * @param {Array} trainerInsights - Array of insight objects with exercise data.
+ * @param {Array} workouts - Array of recent workout objects.
+ * @param {Object} macros - Current macros data.
+ * @param {Object} allMacrosData - Historical macros data.
+ * @param {Object} macrosChart - Average macro trends.
+ * @returns {string} - HTML string of tailored tips.
+ */
+function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart) {
+  const tips = [];
+  const yesterdayCalories = estimateCalories(macros);
+  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1791;
+  const avgProtein = parseFloat(macrosChart?.average?.protein) || 170;
+  const avgCarbs = parseFloat(macrosChart?.average?.carbs) || 135;
+  const avgFat = parseFloat(macrosChart?.average?.fat) || 60;
+
+  if (!workouts.length) {
+    tips.push("Looks like a rest day yesterday. Try a light stretch or walk to aid recovery! How did you feel after yesterday’s rest? Reply with ‘refreshed’ or ‘tired’ to tweak today’s intensity.");
+  }
+
+  const exerciseStats = {};
+  workouts.forEach(w => {
+    w.exercises.forEach(ex => {
+      const title = ex.title.toLowerCase();
+      if (!exerciseStats[title]) exerciseStats[title] = { maxReps: 0, maxWeight: 0, maxDuration: 0 };
+      ex.sets.forEach(s => {
+        if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
+        if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
+          exerciseStats[title].maxWeight = (s.weight_kg * 2.20462).toFixed(1);
+        }
+        if (s.duration_seconds && s.duration_seconds > exerciseStats[title].maxDuration) {
+          exerciseStats[title].maxDuration = s.duration_seconds;
+        }
+      });
+    });
+  });
+
+  // Add progression feedback for relevant exercises
+  if (exerciseStats['push up']) {
+    tips.push(`• <strong>Chin Up</strong>: You’ve hit ${exerciseStats['push up'].maxReps} reps on Push Up—let’s aim for 8-10 clean Chin Up reps today with bodyweight.`);
+  }
+  if (exerciseStats['plank']) {
+    tips.push(`• <strong>Plank</strong>: Your Plank held steady at ${exerciseStats['plank'].maxDuration}s recently—nice! We’re bumping it to 80s today to keep the progress going.`);
+  }
+
+  if (yesterdayCalories < avgCalories - 200) {
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
+  } else if (yesterdayCalories > avgCalories + 200) {
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
+  }
+
+  if (parseFloat(macros.protein) < avgProtein * 0.8) {
+    tips.push(`• Protein was ${formatNumber(macros.protein)}g yesterday—boost it toward your ${formatNumber(avgProtein)}g average with chicken or eggs to support muscle growth.`);
+  }
+
+  return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
 }
 
 /**
