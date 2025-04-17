@@ -1,35 +1,32 @@
 const COACH_GPT_VERSION = 'v1.4 – Weekly Split + Recovery + Supersets + Variety';
 console.log(`🏷️ CoachGPT Version: ${COACH_GPT_VERSION}`);
 
-
 // 1. MODULE IMPORTS
-const express = require("express"); // Web server framework
-const axios = require("axios"); // For making HTTP requests (e.g., to Hevy API)
-const fs = require("fs"); // File system access (reading/writing files)
-const path = require("path"); // Helps build file paths across operating systems
-const fetchAllExercises = require("./exerciseService"); // Custom function to fetch exercise templates
-const { getYesterdaysWorkouts } = require("./getYesterdaysWorkouts"); // Gets yesterday's workout data
-const { generateWeightChart, generateStepsChart, generateMacrosChart, generateCaloriesChart } = require("./chartService"); // Chart generation functions
-const fetchAllWorkouts = require("./fetchAllWorkouts"); // Fetches all workout history
-const analyzeWorkoutHistory = require("./analyzeHistory"); // Analyzes workout trends
-const runDailySync = require("./runDailySync"); // Generates Daily Email
-const autoplan = require("./autoplan"); // Smart workout planner
+const express = require("express");
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
+const fetchAllExercises = require("./exerciseService");
+const { getYesterdaysWorkouts } = require("./getYesterdaysWorkouts");
+const { generateWeightChart, generateStepsChart, generateMacrosChart, generateCaloriesChart } = require("./chartService");
+const fetchAllWorkouts = require("./fetchAllWorkouts");
+const analyzeWorkoutHistory = require("./analyzeHistory");
+const runDailySync = require("./runDailySync");
+const autoplan = require("./autoplan");
 const { sanitizeRoutine } = require("./trainerUtils");
 const { getQuoteOfTheDay } = require("./quoteUtils");
 const fetchEveryWorkout = require('./fetchEveryWorkout');
 
-
-
-
 // 2. CONSTANTS AND CONFIGURATION
-const app = express(); // Creates an Express app instance
-app.use(express.json()); // Middleware to parse JSON request bodies
-const PORT = process.env.PORT || 10000; // Server port (defaults to 10000 if not set in environment)
-const HEVY_API_KEY = process.env.HEVY_API_KEY; // API key for Hevy (stored in environment variables for security)
-const HEVY_API_BASE = "https://api.hevyapp.com/v1"; // Base URL for Hevy API
-const EMAIL_USER = "tomscott2340@gmail.com"; // Email address for sending reports
-const EMAIL_PASS = process.env.EMAIL_PASS; // Email password (stored in environment variables)
-const KG_TO_LBS = 2.20462; // Conversion factor from kilograms to pounds
+const app = express();
+app.use(express.json());
+const PORT = process.env.PORT || 10000;
+const HEVY_API_KEY = process.env.HEVY_API_KEY;
+const HEVY_API_BASE = "https://api.hevyapp.com/v1";
+const EMAIL_USER = "tomscott2340@gmail.com";
+const EMAIL_PASS = process.env.EMAIL_PASS;
+const KG_TO_LBS = 2.20462;
+
 app.get('/fetch-all-history', async (req, res) => {
   try {
     await fetchEveryWorkout();
@@ -51,7 +48,7 @@ function ensureCacheFilesExist() {
   for (const [label, filepath] of Object.entries(cacheFiles)) {
     const fullPath = path.join(__dirname, filepath);
     if (!fs.existsSync(fullPath)) {
-      console.warn(`⚠️  Cache file missing: ${filepath}. Creating empty file...`);
+      console.warn(`⚠️ Cache file missing: ${filepath}. Creating empty file...`);
       fs.writeFileSync(fullPath, JSON.stringify({}));
     } else {
       console.log(`✅ Cache file loaded: ${filepath}`);
@@ -61,18 +58,7 @@ function ensureCacheFilesExist() {
 
 ensureCacheFilesExist();
 
-(async function startServer() {
-  try {
-    console.log("⏳ Priming cache...");
-    await fetchAllExercises();
-    await fetchAllWorkouts();
-    await fetchAllRoutines();
-    console.log("✅ All cache files ready.");
-  } catch (err) {
-    console.error("❌ Failed to initialize cache:", err.message || err);
-  }
-})();
-
+const fetchAllRoutines = require('./fetchAllRoutines');
 
 // 9. API ENDPOINTS
 app.get("/", (req, res) => res.send("🏋️ CoachGPT Middleware is LIVE on port 10000"));
@@ -93,8 +79,6 @@ app.get("/debug-workouts", (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-const fetchAllRoutines = require('./fetchAllRoutines');
 
 app.post('/refresh-routines', async (req, res) => {
   const result = await fetchAllRoutines();
@@ -145,9 +129,9 @@ app.post("/refresh-exercises", async (req, res) => {
 app.post('/autoplan', async (req, res) => {
   try {
     console.log('⚡ /autoplan called from', new Date().toISOString());
-    const workouts = await fetchWorkouts();
-    const templates = await fetchExerciseTemplates();
-    const routines = await fetchRoutines();
+    const workouts = await fetchAllWorkouts();
+    const templates = await fetchAllExercises();
+    const routines = await fetchAllRoutines();
     console.log('🔁 Running autoplan...');
     const result = await autoplan({ workouts, templates, routines });
     if (result.success) {
@@ -164,7 +148,7 @@ app.post('/autoplan', async (req, res) => {
 app.post("/daily", async (req, res) => {
   try {
     console.log("⚡ /daily called from", new Date().toISOString());
-    await runDailySync();
+    await runDailySync(false); // Main sync, allow email generation
     res.status(200).json({ message: "✅ Daily sync complete" });
   } catch (error) {
     console.error("Daily sync error:", error.message);
@@ -181,16 +165,18 @@ app.post("/daily", async (req, res) => {
     await fetchAllRoutines();
     console.log("✅ All cache files ready.");
 
-    // Optional: Run the daily sync immediately at startup
-    await runDailySync();
+    // Add a small delay to ensure file I/O is complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Run the daily sync at startup, but skip email generation
+    await runDailySync(true); // Startup sync, skip email
 
     // Start server only after everything is ready
     app.listen(PORT, () => {
       console.log(`🏋️ CoachGPT Middleware is LIVE on port ${PORT}`);
     });
-
   } catch (err) {
     console.error("❌ Startup failed:", err.message || err);
-    process.exit(1); // Exit with failure so Render can restart if needed
+    process.exit(1);
   }
 })();
