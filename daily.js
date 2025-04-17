@@ -10,6 +10,8 @@ const autoplan = require('./autoplan');
 const sendEmail = require('./sendEmail');
 const generateEmail = require('./generateEmail');
 const { getMacrosFromSheet } = require('./sheetsService');
+const generateHtmlSummary = require('./generateEmail');
+
 
 async function runDailySync() {
   try {
@@ -45,15 +47,19 @@ async function runDailySync() {
     const steps = Number(macroRow?.steps || 0);
 
     // Step 5: Generate and send email
-const emailBody = generateEmail({
-  macros,
-  weight,
-  steps,
-  yesterdayWorkout,
-  todaysWorkout,
-  trainerInsights,
-  workouts, // recent 30 days – used in coach tips
-});
+    const charts = {}; // ⏳ Placeholder if charts aren't implemented yet
+    const quoteText = "“Without struggle, no progress and no result. Every breaking of habit produces a change in the machine.” – G.I. Gurdjieff";
+    const emailBody = generateHtmlSummary(
+      [yesterdayWorkout], // workouts (1-day history for "Yesterday's Workout")
+      macros,
+      [], // allMacrosData (for trend calc – can be empty if not fetched yet)
+      trainerInsights,
+      "TBD", // todayTargetDay (can be split name like "Pull" later)
+      charts,
+      { exercises: todaysWorkout }, // today’s planned workout
+      quoteText
+    );
+    
 
     await sendEmail('🎯 Hevy Daily Summary', emailBody);
 
