@@ -8,11 +8,6 @@
  * @param {Object} workout - A CoachGPT-generated workout object.
  * @returns {string} - HTML string of formatted workout.
  */
-/**
- * Formats a workout object into HTML for display in the email.
- * @param {Object} workout - A CoachGPT-generated workout object.
- * @returns {string} - HTML string of formatted workout.
- */
 function formatWorkoutForEmail(workout) {
   if (!workout || !workout.exercises?.length) {
     return "<p>Looks like no workout is planned today. Take it easy or sneak in some light movement!</p>";
@@ -43,108 +38,7 @@ function formatWorkoutForEmail(workout) {
     </ul>
   `;
 }
-/**
- * Generates personalized coach tips based on workout and macro history.
- * @param {Array} trainerInsights - Array of insight objects with exercise data.
- * @param {Array} workouts - Array of recent workout objects.
- * @param {Object} macros - Current macros data.
- * @param {Object} allMacrosData - Historical macros data.
- * @param {Object} macrosChart - Average macro trends.
- * @returns {string} - HTML string of tailored tips.
- */
-function generateHtmlSummary(
-  workouts,
-  macros,
-  allMacrosData,
-  trainerInsights,
-  todayTargetDay,
-  charts,
-  todaysWorkout,
-  quoteText
-) {
-  const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
-  const userName = process.env.EMAIL_USER || 'there';
 
-  const weightChange = (() => {
-    const validWeights = allMacrosData
-      .map(m => parseFloat(m.weight))
-      .filter(w => !isNaN(w));
-    if (validWeights.length < 2) return null;
-    const delta = validWeights.at(-1) - validWeights[0];
-    const direction = delta < 0 ? "dropped" : "gained";
-    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs over 30 days—keep it up!`;
-  })();
-
-  const workoutBlock = workouts.length > 0 ? workouts.map(w => `
-    <h4 style="color: #333; font-size: 18px;">${w.title}</h4>
-    ${formatWorkoutForEmail(w)}
-  `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
-
-  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout);
-
-  console.log(`Macros data: ${JSON.stringify(macros)}`);
-
-  const macroValues = {
-    calories: estimateCalories(macros),
-    protein: macros.protein || 'N/A',
-    carbs: macros.carbs || 'N/A',
-    fat: macros.fat || 'N/A',
-    weight: macros.weight || 'N/A',
-    steps: macros.steps || 'N/A'
-  };
-  const yesterdayCalories = estimateCalories(macros);
-
-  return `
-    <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1.6;">
-      <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
-      <p style="font-size: 16px;">You're doing awesome—let's dive into yesterday's wins and what's on tap for today!</p>
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Yesterday's Workout</h3>
-      ${workoutBlock}
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Nutrition Snapshot (${formatDate(macros.date)})</h3>
-      <p>Here's how you fueled up yesterday:</p>
-      <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Calories</strong>: ${formatNumber(macroValues.calories)} kcal (Yesterday: ${formatNumber(yesterdayCalories)} kcal est.)</li>
-        <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
-        <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
-        <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
-        <li><strong>Weight</strong>: ${formatNumber(macroValues.weight)} lbs ${weightChange ? `(${weightChange})` : ""}</li>
-        <li><strong>Steps</strong>: ${formatNumber(macroValues.steps)}</li>
-      </ul>
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
-      <p>Check out these trends to see how far you've come:</p>
-      <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
-      <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
-      <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Macros</strong>: Protein ${formatNumber(macrosChart?.average?.protein)}g, Carbs ${formatNumber(macrosChart?.average?.carbs)}g, Fat ${formatNumber(macrosChart?.average?.fat)}g</p>
-      <img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Calories</strong>: Averaging ${formatNumber(calorieChart?.average)} kcal/day</p>
-      <img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
-      <p>${coachTips}</p>
-      <hr style="border: 1px solid #eee; margin: 20px 0;">
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Today’s Workout Plan</h3>
-      ${formatWorkoutForEmail(todaysWorkout)}
-
-      <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">A Little Inspiration</h3>
-      <p style="font-style: italic; color: #555;">"${quoteText}"</p>
-      <p style="font-size: 16px;">You’ve got this! Keep pushing, and I’m here cheering you on.</p>
-      <p style="font-size: 14px; color: #666;">Got feedback? Let me know: <a href="https://forms.gle/yourformlink">here</a></p>
-      <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
-    </div>
-  `;
-}
-
-/**
- * Formats numbers with commas for readability (e.g., 11515 -> 11,515) or returns N/A for invalid input.
- * @param {number|string} num - The number to format.
- * @returns {string} - Formatted number with commas or 'N/A'.
- */
 /**
  * Formats numbers with commas for readability (e.g., 8928 -> 8,928) or returns N/A for invalid input.
  * @param {number|string} num - The number to format.
@@ -170,20 +64,19 @@ function estimateCalories(macros) {
   const protein = parseFloat(macros.protein) || 0;
   const carbs = parseFloat(macros.carbs) || 0;
   const fat = parseFloat(macros.fat) || 0;
-  // Remove commas from calories string before parsing
   const providedCaloriesStr = macros.calories ? String(macros.calories).replace(/[^0-9.]/g, '') : '0';
   const providedCalories = parseFloat(providedCaloriesStr) || 0;
   const estimatedCalories = (protein * 4) + (carbs * 4) + (fat * 9);
   
   console.log(`Provided calories: ${providedCalories}, Estimated: ${estimatedCalories}`);
   
-  // Only estimate if provided calories are truly invalid (e.g., 0 or undefined)
   if (providedCalories === 0) {
     console.log(`Using estimated calories: ${estimatedCalories}`);
     return estimatedCalories;
   }
   return providedCalories;
 }
+
 /**
  * Formats a date string to MM-DD-YYYY format.
  * @param {string|Date} date - The date to format.
@@ -230,16 +123,63 @@ function getExerciseTrend(workouts, exerciseTitle) {
 }
 
 /**
-
  * Generates personalized coach tips based on workout and macro history.
  * @param {Array} trainerInsights - Array of insight objects with exercise data.
  * @param {Array} workouts - Array of recent workout objects.
  * @param {Object} macros - Current macros data.
  * @param {Object} allMacrosData - Historical macros data.
  * @param {Object} macrosChart - Average macro trends.
+ * @param {Object} stepsChart - Average step trends.
+ * @param {Object} todaysWorkout - Today's planned workout.
  * @returns {string} - HTML string of tailored tips.
  */
+function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout) {
+  const tips = [];
+  const yesterdayCalories = estimateCalories(macros);
+  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
+  const avgProtein = parseFloat(macrosChart?.average?.protein) || 178;
+  const avgSteps = parseFloat(stepsChart?.average) || 11462;
+  const yesterdaySteps = parseFloat(macros.steps.replace(/[^0-9.]/g, '')) || 0;
+  const workoutSplit = todaysWorkout?.title?.replace('CoachGPT – ', '') || 'workout';
 
+  if (!workouts.length) {
+    const stepsThreshold = avgSteps * 0.8;
+    const stepsMessage = yesterdaySteps >= stepsThreshold
+      ? `Your ${formatNumber(yesterdaySteps)} steps kept you active on a rest day—nice work!`
+      : `Your ${formatNumber(yesterdaySteps)} steps yesterday were a bit low compared to your ${formatNumber(avgSteps)} average—try adding a short walk today to stay on track.`;
+    
+    tips.push(`${stepsMessage} With protein at ${formatNumber(macros.protein)}g, you’re set for today’s ${workoutSplit}. Try a 5-min dynamic stretch (like arm circles) to prep for today’s session. Feeling refreshed or tired after yesterday? Reply to tweak intensity.`);
+  }
+
+  const exerciseStats = {};
+  workouts.forEach(w => {
+    w.exercises.forEach(ex => {
+      const title = ex.title.toLowerCase();
+      if (!exerciseStats[title]) exerciseStats[title] = { maxReps: 0, maxWeight: 0, maxDuration: 0 };
+      ex.sets.forEach(s => {
+        if (s.reps > exerciseStats[title].maxReps) exerciseStats[title].maxReps = s.reps;
+        if (s.weight_kg && (s.weight_kg * 2.20462) > exerciseStats[title].maxWeight) {
+          exerciseStats[title].maxWeight = (s.weight_kg * 2.20462).toFixed(1);
+        }
+        if (s.duration_seconds && s.duration_seconds > exerciseStats[title].maxDuration) {
+          exerciseStats[title].maxDuration = s.duration_seconds;
+        }
+      });
+    });
+  });
+
+  if (exerciseStats['push up']) {
+    tips.push(`• <strong>Chin Up</strong>: Your bodyweight Chin Ups are looking strong—aim for 8-10 clean reps today, building on your ${exerciseStats['push up'].maxReps}-rep Push Up capacity.`);
+  }
+
+  if (yesterdayCalories < avgCalories - 200) {
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday was below your ${formatNumber(avgCalories)} kcal average—add a snack like nuts or yogurt to fuel your workouts.`);
+  } else if (yesterdayCalories > avgCalories + 200) {
+    tips.push(`• Your ${formatNumber(yesterdayCalories)} kcal yesterday exceeded your ${formatNumber(avgCalories)} kcal average—great if bulking, but cut back if aiming to lean out.`);
+  }
+
+  return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
+}
 
 /**
  * Generates HTML summary for the daily email.
@@ -272,7 +212,7 @@ function generateHtmlSummary(
     ${formatWorkoutForEmail(w)}
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
-  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart);
+  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout);
 
   console.log(`Macros data: ${JSON.stringify(macros)}`);
 
@@ -286,7 +226,6 @@ function generateHtmlSummary(
   };
   const yesterdayCalories = estimateCalories(macros);
 
-  // Debug the final formatted values before rendering
   console.log(`Final formatted values - Calories: ${formatNumber(macroValues.calories)}, Steps: ${formatNumber(macroValues.steps)}`);
 
   return `
