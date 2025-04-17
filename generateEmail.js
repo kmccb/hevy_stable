@@ -135,6 +135,14 @@ function getExerciseTrend(workouts, exerciseTitle) {
  * @returns {string} - HTML string of tailored tips.
  */
 function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback = "refreshed") {
+  console.log("Entering generateCoachTips with todaysWorkout:", JSON.stringify(todaysWorkout));
+
+  // Early return if todaysWorkout is invalid
+  if (!todaysWorkout || typeof todaysWorkout !== 'object') {
+    console.error("Error: todaysWorkout is invalid in generateCoachTips:", todaysWorkout);
+    return "No workout plan available today—let’s focus on recovery! How are you feeling? Reply to tweak tomorrow’s plan.";
+  }
+
   const tips = [];
   const yesterdayCalories = estimateCalories(macros);
   const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
@@ -142,11 +150,12 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   const avgSteps = parseFloat(stepsChart?.average) || 11462;
   const yesterdaySteps = parseFloat(macros.steps.replace(/[^0-9.]/g, '')) || 0;
 
-  // Defensive check for todaysWorkout
-  if (!todaysWorkout) {
-    console.log("Error: todaysWorkout is undefined or null in generateCoachTips");
+  // Ensure title exists
+  if (!todaysWorkout.title) {
+    console.error("Error: todaysWorkout.title is missing:", todaysWorkout);
+    todaysWorkout.title = "Rest Day"; // Fallback title
   }
-  const workoutSplit = todaysWorkout?.title?.replace('CoachGPT – ', '') || 'workout';
+  const workoutSplit = todaysWorkout.title.replace('CoachGPT – ', '') || 'workout';
 
   // Step count feedback
   if (!workouts.length) {
@@ -170,7 +179,7 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   }
 
   // Add progression insight for the first exercise in today's workout
-  if (todaysWorkout?.exercises?.length) {
+  if (todaysWorkout.exercises?.length) {
     const firstExercise = todaysWorkout.exercises[0].title;
     const trend = getExerciseTrend(allMacrosData, firstExercise);
     if (trend) {
@@ -228,8 +237,7 @@ function generateHtmlSummary(
   const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
   const userName = process.env.EMAIL_USER || 'there';
 
-  // Log todaysWorkout to diagnose the issue
-  console.log("todaysWorkout in generateHtmlSummary:", JSON.stringify(todaysWorkout));
+  console.log("todaysWorkout in generateHtmlSummary (before coachTips):", JSON.stringify(todaysWorkout));
 
   const weightChange = (() => {
     const validWeights = allMacrosData
@@ -249,6 +257,8 @@ function generateHtmlSummary(
   // Simulate user feedback for now
   const userFeedback = "refreshed";
   const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback);
+
+  console.log("todaysWorkout in generateHtmlSummary (after coachTips):", JSON.stringify(todaysWorkout));
 
   console.log(`Macros data: ${JSON.stringify(macros)}`);
 
