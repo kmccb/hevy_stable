@@ -13,4 +13,4 @@ jobs:
     steps:
       - name: Call Render daily endpoint
         run: |
-          curl -X POST https://hevy-middleware-clean.onrender.com/daily
+          curl -X POST https://hevy-coachgpt-nextgen.onrender.com/daily
