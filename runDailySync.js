@@ -14,7 +14,7 @@ const { analyzeWorkouts } = require("./trainerUtils");
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.5 – Strengthened todaysWorkout validation");
+console.log("🏷️ runDailySync.js Version: v1.6 – Added chart logging");
 
 // Log environment variables (mask password for security)
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
@@ -59,7 +59,7 @@ async function runDailySync(isCachePriming = false) {
 
     // Skip email generation during cache priming or if todaysWorkout is invalid
     if (isCachePriming) {
-      console.log(" skipping email generation during cache priming.");
+      console.log("Skipping email generation during cache priming.");
       return;
     }
 
@@ -87,6 +87,12 @@ async function runDailySync(isCachePriming = false) {
     const macrosChart = await generateMacrosChart(allMacros);
     const calorieChart = await generateCaloriesChart(allMacros);
     console.log("📈 Charts generated successfully");
+    console.log("📈 Chart objects:", {
+      weightChart: { buffer: !!weightChart?.buffer, average: weightChart?.average },
+      stepsChart: { buffer: !!stepsChart?.buffer, average: stepsChart?.average },
+      macrosChart: { buffer: !!macrosChart?.buffer, average: macrosChart?.average },
+      calorieChart: { buffer: !!calorieChart?.buffer, average: calorieChart?.average }
+    });
 
     console.log("🧠 Generating trainer insights...");
     const trainerInsights = recentWorkouts.length === 0 ? [] : analyzeWorkouts(recentWorkouts);

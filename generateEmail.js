@@ -300,6 +300,23 @@ function generateHtmlSummary(
 
   console.log(`Final formatted values - Calories: ${formatNumber(macroValues.calories)}, Steps: ${formatNumber(macroValues.steps)}`);
 
+  // Log chart objects before using them
+  console.log("Chart objects in generateHtmlSummary:", {
+    weightChart: { buffer: !!weightChart?.buffer, average: weightChart?.average },
+    stepsChart: { buffer: !!stepsChart?.buffer, average: stepsChart?.average },
+    macrosChart: { buffer: !!macrosChart?.buffer, average: macrosChart?.average },
+    calorieChart: { buffer: !!calorieChart?.buffer, average: calorieChart?.average }
+  });
+
+  // Safely access chart data
+  const stepsAvg = stepsChart && typeof stepsChart.average === 'number' ? formatNumber(stepsChart.average) : 'N/A';
+  const macrosProtein = macrosChart?.average?.protein ? formatNumber(macrosChart.average.protein) : 'N/A';
+  const macrosCarbs = macrosChart?.average?.carbs ? formatNumber(macrosChart.average.carbs) : 'N/A';
+  const macrosFat = macrosChart?.average?.fat ? formatNumber(macrosChart.average.fat) : 'N/A';
+  const calorieAvg = calorieChart && typeof calorieChart.average === 'number' ? formatNumber(calorieChart.average) : 'N/A';
+
+  console.log("Computed chart values:", { stepsAvg, macrosProtein, macrosCarbs, macrosFat, calorieAvg });
+
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1:6;">
       <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
@@ -322,13 +339,13 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over 30 Days</h3>
       <p>Check out these trends to see how far you've come:</p>
       <p><strong>Weight</strong>: ${weightChange || "Not enough data yet—keep logging!"}</p>
-      <img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Steps</strong>: Averaging ${formatNumber(stepsChart?.average)} steps/day</p>
-      <img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Macros</strong>: Protein ${formatNumber(macrosChart?.average?.protein)}g, Carbs ${formatNumber(macrosChart?.average?.carbs)}g, Fat ${formatNumber(macrosChart?.average?.fat)}g</p>
-      <img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">
-      <p><strong>Calories</strong>: Averaging ${formatNumber(calorieChart?.average)} kcal/day</p>
-      <img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">
+      ${weightChart?.buffer ? '<img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Weight chart unavailable.</p>'}
+      <p><strong>Steps</strong>: Averaging ${stepsAvg} steps/day</p>
+      ${stepsChart?.buffer ? '<img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Steps chart unavailable.</p>'}
+      <p><strong>Macros</strong>: Protein ${macrosProtein}g, Carbs ${macrosCarbs}g, Fat ${macrosFat}g</p>
+      ${macrosChart?.buffer ? '<img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Macros chart unavailable.</p>'}
+      <p><strong>Calories</strong>: Averaging ${calorieAvg} kcal/day</p>
+      ${calorieChart?.buffer ? '<img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Calories chart unavailable.</p>'}
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
       <p>${coachTips}</p>
@@ -379,10 +396,10 @@ async function sendDailyEmail(workouts, macros, allMacrosData, trainerInsights, 
       subject: `🎯 Hevy Daily Summary (${formatDate(macros.date)})`,
       html,
       attachments: [
-        { filename: "weight.png", content: charts.weightChart.buffer, cid: "weightChart" },
-        { filename: "steps.png", content: charts.stepsChart.buffer, cid: "stepsChart" },
-        { filename: "macros.png", content: charts.macrosChart.buffer, cid: "macrosChart" },
-        { filename: "calories.png", content: charts.calorieChart.buffer, cid: "caloriesChart" }
+        { filename: "weight.png", content: charts.weightChart?.buffer || Buffer.from(''), cid: "weightChart" },
+        { filename: "steps.png", content: charts.stepsChart?.buffer || Buffer.from(''), cid: "stepsChart" },
+        { filename: "macros.png", content: charts.macrosChart?.buffer || Buffer.from(''), cid: "macrosChart" },
+        { filename: "calories.png", content: charts.calorieChart?.buffer || Buffer.from(''), cid: "caloriesChart" }
       ]
     });
     console.log("✅ Daily summary sent!");
