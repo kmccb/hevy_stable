@@ -114,16 +114,28 @@ function formatDate(date) {
 function getExerciseTrend(workouts, exerciseTitle) {
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-  const relevantWorkouts = workouts.filter(w => new Date(w.date) >= twoWeeksAgo);
+  const relevantWorkouts = workouts.filter(w => {
+    const workoutDate = new Date(w.date);
+    return workoutDate >= twoWeeksAgo;
+  });
+
+  console.log(`getExerciseTrend - Relevant workouts for ${exerciseTitle}:`, relevantWorkouts.length);
+
   const exerciseData = relevantWorkouts
-    .flatMap(w => w.exercises)
-    .filter(e => e.title.toLowerCase() === exerciseTitle.toLowerCase())
-    .map(e => ({
-      date: new Date(w.date),
-      maxWeight: Math.max(...e.sets.map(s => (s.weight_kg || 0) * 2.20462)),
-      maxReps: Math.max(...e.sets.map(s => s.reps || 0))
-    }))
+    .flatMap(w => (w.exercises || [])) // Guard against missing exercises
+    .filter(e => e && e.title && e.title.toLowerCase() === exerciseTitle.toLowerCase())
+    .map((e, idx) => {
+      // Find the workout this exercise belongs to
+      const workout = relevantWorkouts.find(w => w.exercises && w.exercises.includes(e));
+      return {
+        date: workout ? new Date(workout.date) : new Date(),
+        maxWeight: Math.max(...(e.sets || []).map(s => (s.weight_kg || 0) * 2.20462)),
+        maxReps: Math.max(...(e.sets || []).map(s => s.reps || 0))
+      };
+    })
     .sort((a, b) => a.date - b.date);
+
+  console.log(`getExerciseTrend - Exercise data for ${exerciseTitle}:`, exerciseData);
 
   if (exerciseData.length < 2) return "";
   const first = exerciseData[0];
@@ -196,7 +208,7 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
   // Add progression insight for the first exercise in today's workout
   if (todaysWorkout.exercises?.length) {
     const firstExercise = todaysWorkout.exercises[0].title;
-    const trend = getExerciseTrend(allMacrosData, firstExercise);
+    const trend = getExerciseTrend(workouts, firstExercise); // Fixed to use workouts instead of allMacrosData
     if (trend) {
       tips.push(`• <strong>${firstExercise}</strong>: ${trend}`);
     }
@@ -233,7 +245,9 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
     tips.push(`Feeling refreshed or tired after yesterday? Reply to tweak intensity.`);
   }
 
-  return tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
+  const finalTips = tips.length ? tips.join("<br>") : "You’re on track—keep the good work going!";
+  console.log("generateCoachTips - Final tips:", finalTips);
+  return finalTips;
 }
 
 /**
@@ -284,7 +298,9 @@ function generateHtmlSummary(
   const userFeedback = "refreshed";
   const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback);
 
-  console.log("todaysWorkout in generateHtmlSummary (after coachTips):", JSON.stringify(todaysWorkout));
+  // Debug logging without JSON.stringify
+  console.log("After generateCoachTips - todaysWorkout exists:", !!todaysWorkout);
+  console.log("After generateCoachTips - todaysWorkout.title:", todaysWorkout ? todaysWorkout.title : 'undefined');
 
   console.log(`Macros data: ${JSON.stringify(macros)}`);
 
