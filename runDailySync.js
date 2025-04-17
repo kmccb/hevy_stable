@@ -14,9 +14,12 @@ const { analyzeWorkouts } = require("./trainerUtils");
 
 const { EMAIL_USER } = process.env;
 
-async function runDailySync() {
+// Add a version log to confirm this file is loaded
+console.log("🏷️ runDailySync.js Version: v1.1 – Added isCachePriming logic");
+
+async function runDailySync(isCachePriming = false) {
   try {
-    console.log("🔁 Running daily sync... [runDailySync.js]");
+    console.log(`🔁 Running daily sync... [runDailySync.js] (isCachePriming: ${isCachePriming})`);
 
     await fetchAllExercises();
     await fetchAllWorkouts();
@@ -39,6 +42,17 @@ async function runDailySync() {
       todaysWorkout.title = "CoachGPT – Planned Workout";
     }
     console.log('todaysWorkout after autoplan in runDailySync.js:', JSON.stringify(todaysWorkout));
+
+    // Skip email generation during cache priming or if todaysWorkout is invalid
+    if (isCachePriming) {
+      console.log("Skipping email generation during cache priming.");
+      return;
+    }
+
+    if (!todaysWorkout.title || !todaysWorkout.exercises?.length) {
+      console.warn("Skipping email generation: todaysWorkout is not fully populated:", JSON.stringify(todaysWorkout));
+      return;
+    }
 
     const recentWorkouts = await getYesterdaysWorkouts();
     const macros = await getMacrosFromSheet();
@@ -98,6 +112,7 @@ async function runDailySync() {
     console.log("✅ Daily summary sent!");
   } catch (err) {
     console.error("❌ runDailySync.js - Daily sync failed:", err.message || err);
+    throw err; // Rethrow to ensure the error is visible in the caller
   }
 }
 
