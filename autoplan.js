@@ -234,6 +234,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const usedTitles = new Set();
   const selectedExercises = [];
 
+  // Prioritize undertrained muscles, but cycle to ensure upper back isn’t skipped
   const sortedMuscleGroups = [...muscleGroups].sort((a, b) => {
     const freqA = historyAnalysis.muscleGroupFrequency[a.toLowerCase()] || 0;
     const freqB = historyAnalysis.muscleGroupFrequency[b.toLowerCase()] || 0;
@@ -243,7 +244,9 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-  for (const muscle of sortedMuscleGroups) {
+  // Try each muscle group at least once
+  for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
+    const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
     const candidates = templates.filter(t => {
       const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
       let isRecent = recentTitles.has(t.title);
@@ -280,6 +283,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     }
   }
 
+  // Fill remaining slots, cycling muscles
   while (selectedExercises.length < numExercises) {
     const muscle = sortedMuscleGroups[Math.floor(Math.random() * sortedMuscleGroups.length)];
     const candidates = templates.filter(t => {
@@ -324,10 +328,11 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
   const selectedExercises = [];
   const usedTitles = new Set();
 
+  // Expanded priority list for better variety
   const priorityExercises = [
-    { muscle: 'abdominals', note: "Focus on slow reps", mustHave: ['crunch', 'raise', 'sit up'] },
-    { muscle: 'obliques', note: "Controlled twists", mustHave: ['twist', 'side plank'] },
-    { muscle: 'abdominals', note: "Isometric hold", mustHave: ['plank', 'hold', 'dead bug'] }
+    { muscle: 'abdominals', note: "Focus on slow reps", mustHave: ['crunch', 'raise', 'sit up', 'leg raise'] },
+    { muscle: 'obliques', note: "Controlled twists", mustHave: ['twist', 'side plank', 'woodchopper', 'russian'] },
+    { muscle: 'abdominals', note: "Isometric hold", mustHave: ['plank', 'hold', 'dead bug', 'hollow'] }
   ];
 
   const threeDaysAgo = new Date();
@@ -335,7 +340,7 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
 
   for (let i = 0; i < numExercises; i++) {
     const { muscle, note, mustHave } = priorityExercises[i % priorityExercises.length];
-    const candidates = templates.filter(t => {
+    let candidates = templates.filter(t => {
       const primaryMatch = t.primary_muscle_group?.toLowerCase().includes(muscle);
       const titleMatch = mustHave.some(k => t.title.toLowerCase().includes(k));
       let isRecent = recentTitles.has(t.title);
@@ -346,13 +351,27 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
       return primaryMatch && titleMatch && !usedTitles.has(t.title) && !isRecent;
     });
 
+    // Fallback if no specific candidates found
+    if (candidates.length === 0) {
+      console.log(`⚠️ No specific abs template found for ${muscle}. Falling back to any ${muscle} exercise.`);
+      candidates = templates.filter(t => {
+        const primaryMatch = t.primary_muscle_group?.toLowerCase().includes(muscle);
+        let isRecent = recentTitles.has(t.title);
+        if (workouts && workouts.length > 0) {
+          const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
+          isRecent = lastUsed && new Date(lastUsed) > threeDaysAgo;
+        }
+        return primaryMatch && !usedTitles.has(t.title) && !isRecent;
+      });
+    }
+
     if (candidates.length > 0) {
       const selected = candidates[Math.floor(Math.random() * candidates.length)];
       console.log(`✅ Selected Abs: ${selected.title} (Muscle: ${muscle})`);
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ No suitable abs template found for ${muscle}.`);
+      console.log(`⚠️ No abs template found for ${muscle} even after fallback.`);
     }
   }
 
@@ -414,6 +433,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   const allExercises = [];
   const usedExerciseIds = new Set();
 
+  // Supersets (up to 3 pairs, max 6 exercises)
   const supersetPairs = Math.min(Math.floor(validExercises.length / 2), Math.floor(validAbsExercises.length / 2), 3);
   for (let i = 0; i < supersetPairs; i++) {
     if (i >= validExercises.length || i >= validAbsExercises.length) break;
@@ -451,6 +471,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     usedExerciseIds.add(abs.id);
   }
 
+  // Solo strength finishers (up to 2)
   const remainingStrengths = validExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 2);
   for (const ex of remainingStrengths) {
     const weight = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
@@ -469,6 +490,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 7) break;
   }
 
+  // Abs finisher (at least 1, if available)
   const remainingAbs = validAbsExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 1);
   for (const abs of remainingAbs) {
     const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
@@ -487,6 +509,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 8) break;
   }
 
+  // Ensure 6–8 exercises
   if (allExercises.length < 6 && validExercises.length + validAbsExercises.length > allExercises.length) {
     const extra = validExercises.concat(validAbsExercises)
       .filter(ex => !usedExerciseIds.has(ex.id))
@@ -507,11 +530,13 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     }
   }
 
+  // Cap at 8
   if (allExercises.length > 8) {
     allExercises.length = 8;
     console.warn("⚠️ Routine trimmed to 8 exercises.");
   }
 
+  // Deduplicate
   const deduped = [];
   const seenIds = new Set();
   for (const ex of allExercises) {
@@ -581,7 +606,8 @@ async function updateRoutine(routineId, workoutType, exercises, absExercises) {
       const response = await makeApiRequestWithRetry('put', `${BASE_URL}/routines/${routineId}`, payload, headers, 3, 1000);
       const routineTitle = response.data?.routine?.title || response.data?.title || routinePayload.title;
       console.log(`✅ Routine updated: ${routineTitle} (ID: ${routineId})`);
-      return response.data;
+      // Normalize response to always include routine object
+      return response.data.routine || response.data;
     } catch (err) {
       console.error(`❌ Attempt ${attempt}/${updateAttempts} - Failed to update routine (ID: ${routineId}):`, err.response?.data || err.message);
       if (attempt === updateAttempts) {
@@ -746,8 +772,10 @@ async function autoplan({ workouts, templates, routines }) {
       }
     }
 
-    if (routine.routine.exercises.length < 6 && workoutType !== "Cardio") {
-      console.warn(`⚠️ Routine has only ${routine.routine.exercises.length} exercises. Retrying with relaxed filters...`);
+    // Validate routine has 6–8 exercises (except Cardio)
+    const exercises = routine.exercises || (routine.routine && routine.routine.exercises) || [];
+    if (exercises.length < 6 && workoutType !== "Cardio") {
+      console.warn(`⚠️ Routine has only ${exercises.length} exercises. Retrying with relaxed filters...`);
       const mainExercises = pickExercises(workouts, exerciseTemplates, muscleTargets[workoutType], new Set(), historyAnalysis.progressionAnalysis, () => true, 6);
       const absExercises = pickAbsExercises(workouts, exerciseTemplates, new Set(), 3);
       routine = existingRoutine && isValidRoutine
