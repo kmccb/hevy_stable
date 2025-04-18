@@ -182,7 +182,7 @@ function computeMetrics(allMacros, workouts) {
   }).filter(v => v !== null);
   const daysLogged = workoutValues.reduce((sum, v) => sum + v.value, 0);
   const totalDays = sortedData.length;
-  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null;
+  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null;
   const workoutTrend = calculateTrendSlope(workoutValues);
 
   return {
