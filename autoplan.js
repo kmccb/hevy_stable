@@ -235,28 +235,42 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const usedTitles = new Set();
   const selectedExercises = [];
 
-  // Prioritize undertrained muscles, cycle to ensure balance
+  // Prioritize undertrained muscles
   const sortedMuscleGroups = [...muscleGroups].sort((a, b) => {
     const freqA = historyAnalysis.muscleGroupFrequency[a.toLowerCase()] || 0;
     const freqB = historyAnalysis.muscleGroupFrequency[b.toLowerCase()] || 0;
     return freqA - freqB;
   });
 
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  const fiveDaysAgo = new Date();
+  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5); // Relaxed freshness
 
-  // Try each muscle group at least once
+  // Try each muscle group
   for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
     const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
-    const candidates = templates.filter(t => {
+    let candidates = templates.filter(t => {
       const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
       let isRecent = recentTitles.has(t.title);
       if (workouts && workouts.length > 0) {
         const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-        isRecent = lastUsed && new Date(lastUsed) > threeDaysAgo;
+        isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
       }
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
+
+    // Fallback to any pull muscle if needed
+    if (candidates.length === 0 && muscleGroups.includes(muscle)) {
+      console.log(`⚠️ No suitable template found for ${muscle}. Falling back to any Pull muscle.`);
+      candidates = templates.filter(t => {
+        const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
+        let isRecent = recentTitles.has(t.title);
+        if (workouts && workouts.length > 0) {
+          const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
+          isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
+        }
+        return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
+      });
+    }
 
     if (candidates.length > 0) {
       const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
@@ -277,9 +291,9 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ No suitable template found for ${muscle}. Available templates:`,
+      console.log(`⚠️ No suitable template found for ${muscle} even after fallback. Available templates:`,
         templates
-          .filter(t => (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase()))
+          .filter(t => muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase())))
           .map(t => t.title));
     }
   }
@@ -287,18 +301,32 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   // Fill remaining slots
   while (selectedExercises.length < numExercises) {
     const muscle = sortedMuscleGroups[Math.floor(Math.random() * sortedMuscleGroups.length)];
-    const candidates = templates.filter(t => {
+    let candidates = templates.filter(t => {
       const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
       let isRecent = recentTitles.has(t.title);
       if (workouts && workouts.length > 0) {
         const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-        isRecent = lastUsed && new Date(lastUsed) > threeDaysAgo;
+        isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
       }
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
+    // Fallback to any pull muscle
     if (candidates.length === 0) {
-      console.log(`⚠️ No more suitable templates found for ${muscle}. Stopping at ${selectedExercises.length} exercises.`);
+      console.log(`⚠️ No more suitable templates found for ${muscle}. Falling back to any Pull muscle.`);
+      candidates = templates.filter(t => {
+        const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
+        let isRecent = recentTitles.has(t.title);
+        if (workouts && workouts.length > 0) {
+          const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
+          isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
+        }
+        return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
+      });
+    }
+
+    if (candidates.length === 0) {
+      console.log(`⚠️ No more templates found for ${muscle}. Stopping at ${selectedExercises.length} exercises.`);
       break;
     }
 
@@ -331,12 +359,12 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
 
   const priorityExercises = [
     { muscle: 'abdominals', note: "Focus on slow reps", mustHave: ['crunch', 'raise', 'sit up', 'leg raise'] },
-    { muscle: 'obliques', note: "Controlled twists", mustHave: ['twist', 'side plank', 'woodchopper', 'russian'] },
-    { muscle: 'abdominals', note: "Isometric hold", mustHave: ['plank', 'hold', 'dead bug', 'hollow'] }
+    { muscle: 'obliques', note: "Controlled twists", mustHave: ['twist', 'side plank', 'woodchopper', 'russian', 'side bend'] },
+    { muscle: 'abdominals', note: "Isometric hold", mustHave: ['plank', 'hold', 'dead bug', 'hollow', 'l-sit'] }
   ];
 
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  const fiveDaysAgo = new Date();
+  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
 
   for (let i = 0; i < numExercises; i++) {
     const { muscle, note, mustHave } = priorityExercises[i % priorityExercises.length];
@@ -346,7 +374,7 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
       let isRecent = recentTitles.has(t.title);
       if (workouts && workouts.length > 0) {
         const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-        isRecent = lastUsed && new Date(lastUsed) > threeDaysAgo;
+        isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
       }
       return primaryMatch && titleMatch && !usedTitles.has(t.title) && !isRecent;
     });
@@ -359,7 +387,7 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
         let isRecent = recentTitles.has(t.title);
         if (workouts && workouts.length > 0) {
           const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-          isRecent = lastUsed && new Date(lastUsed) > threeDaysAgo;
+          isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
         }
         return primaryMatch && !usedTitles.has(t.title) && !isRecent;
       });
@@ -419,7 +447,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     const isAbs = ex.primary_muscle_group?.toLowerCase().includes('abdominals') ||
                   ex.primary_muscle_group?.toLowerCase().includes('obliques');
     const isBodyweight = !ex.equipment || ex.equipment.toLowerCase() === 'none';
-    const durationKeywords = ['plank', 'hold', 'dead bug', 'side bridge', 'wall sit', 'hanging', 'isometric', 'static', 'bridge', 'superman', 'bird dog'];
+    const durationKeywords = ['plank', 'hold', 'dead bug', 'side bridge', 'wall sit', 'hanging', 'isometric', 'static', 'bridge', 'superman', 'bird dog', 'l-sit'];
     return durationKeywords.some(k => titleLower.includes(k)) ||
            (isAbs && isBodyweight && !titleLower.includes('crunch') && !titleLower.includes('twist'));
   };
@@ -433,8 +461,8 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   const allExercises = [];
   const usedExerciseIds = new Set();
 
-  // Supersets (up to 3 pairs)
-  const supersetPairs = Math.min(Math.floor(validExercises.length / 2), Math.floor(validAbsExercises.length / 2), 3);
+  // Supersets (aim for 2–3)
+  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 3);
   for (let i = 0; i < supersetPairs; i++) {
     if (i >= validExercises.length || i >= validAbsExercises.length) break;
     const strength = validExercises[i];
@@ -490,7 +518,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 7) break;
   }
 
-  // Abs finisher (at least 1)
+  // Abs finisher (up to 1)
   const remainingAbs = validAbsExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 1);
   for (const abs of remainingAbs) {
     const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
@@ -509,8 +537,8 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 8) break;
   }
 
-  // Pad to 6–8 if needed
-  if (allExercises.length < 6 && validExercises.length + validAbsExercises.length > allExercises.length) {
+  // Pad to 6–8
+  if (allExercises.length < 6) {
     const extra = validExercises.concat(validAbsExercises)
       .filter(ex => !usedExerciseIds.has(ex.id))
       .slice(0, 6 - allExercises.length);
@@ -606,7 +634,6 @@ async function updateRoutine(routineId, workoutType, exercises, absExercises) {
       const response = await makeApiRequestWithRetry('put', `${BASE_URL}/routines/${routineId}`, payload, headers, 3, 1000);
       const routineTitle = response.data?.routine?.title || response.data?.title || routinePayload.title;
       console.log(`✅ Routine updated: ${routineTitle} (ID: ${routineId})`);
-      // Handle array response
       return Array.isArray(response.data) ? response.data[0] : (response.data.routine || response.data);
     } catch (err) {
       console.error(`❌ Attempt ${attempt}/${updateAttempts} - Failed to update routine (ID: ${routineId}):`, err.response?.data || err.message);
@@ -786,7 +813,6 @@ async function autoplan({ workouts, templates, routines }) {
       routine = existingRoutine && isValidRoutine
         ? await updateRoutine(existingRoutine.id, workoutType, mainExercises, absExercises)
         : await createRoutine(workoutType, mainExercises, absExercises);
-      // Re-check exercises after retry
       if (Array.isArray(routine)) {
         exercises = routine[0]?.exercises || [];
       } else {
@@ -794,7 +820,7 @@ async function autoplan({ workouts, templates, routines }) {
       }
     }
 
-    // Format todaysWorkout for runDailySync.js
+    // Format todaysWorkout
     const todaysWorkout = {
       id: Array.isArray(routine) ? routine[0]?.id : routine.id,
       title: Array.isArray(routine) ? routine[0]?.title : (routine.title || routine.routine?.title),
