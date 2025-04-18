@@ -20,9 +20,8 @@ const { analyzeWorkouts } = require("./trainerUtils");
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.10 – Fixed workout consistency error");
+console.log("🏷️ runDailySync.js Version: v1.11 – Fixed todaysWorkout extraction");
 
-// Log environment variables (mask password for security)
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
 
 /**
@@ -35,7 +34,7 @@ function normalizeDate(date) {
   try {
     const d = new Date(date);
     if (isNaN(d.getTime())) return null;
-    return d.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+    return d.toISOString().split('T')[0];
   } catch (e) {
     console.warn(`Invalid date format: ${date}`);
     return null;
@@ -50,7 +49,6 @@ function normalizeDate(date) {
 function calculateTrendSlope(data) {
   if (!data || data.length < 2) return null;
 
-  // Convert dates to days since earliest date
   const earliestDate = new Date(Math.min(...data.map(d => new Date(d.date))));
   const points = data.map(d => {
     const days = (new Date(d.date) - earliestDate) / (1000 * 60 * 60 * 24);
@@ -63,7 +61,6 @@ function calculateTrendSlope(data) {
   const sumXY = points.reduce((sum, p) => sum + p.x * p.y, 0);
   const sumXX = points.reduce((sum, p) => sum + p.x * p.x, 0);
 
-  // Slope = (n * Σ(xy) - Σx * Σy) / (n * Σ(x²) - (Σx)²)
   const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
   return isNaN(slope) ? null : slope;
 }
@@ -86,7 +83,6 @@ function computeMetrics(allMacros, workouts) {
     };
   }
 
-  // Sort by date and filter out invalid entries
   const sortedData = allMacros
     .filter(m => m.date && normalizeDate(m.date))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -102,39 +98,33 @@ function computeMetrics(allMacros, workouts) {
     };
   }
 
-  // Helper to compute average
   const computeAverage = (values) => {
     const valid = values.filter(v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0).map(v => parseFloat(v));
     return valid.length ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
   };
 
-  // Weight
   const weightValues = sortedData.map(d => ({ date: d.date, value: d.weight }));
   const weightAverage = computeAverage(weightValues.map(d => d.value));
-  const weightTrend = calculateTrendSlope(weightValues); // Slope in lbs/day
+  const weightTrend = calculateTrendSlope(weightValues);
 
-  // Steps
   const stepsValues = sortedData.map(d => ({ date: d.date, value: d.steps.replace(/[^0-9.]/g, '') }));
   const stepsAverage = computeAverage(stepsValues.map(d => d.value));
-  const stepsTrend = calculateTrendSlope(stepsValues); // Slope in steps/day
+  const stepsTrend = calculateTrendSlope(stepsValues);
 
-  // Macros
   const proteinValues = sortedData.map(d => ({ date: d.date, value: d.protein }));
   const carbsValues = sortedData.map(d => ({ date: d.date, value: d.carbs }));
   const fatValues = sortedData.map(d => ({ date: d.date, value: d.fat }));
   const proteinAverage = computeAverage(proteinValues.map(d => d.value));
   const carbsAverage = computeAverage(carbsValues.map(d => d.value));
   const fatAverage = computeAverage(fatValues.map(d => d.value));
-  const proteinTrend = calculateTrendSlope(proteinValues); // Slope in g/day
-  const carbsTrend = calculateTrendSlope(carbsValues); // Slope in g/day
-  const fatTrend = calculateTrendSlope(fatValues); // Slope in g/day
+  const proteinTrend = calculateTrendSlope(proteinValues);
+  const carbsTrend = calculateTrendSlope(carbsValues);
+  const fatTrend = calculateTrendSlope(fatValues);
 
-  // Calories
   const calorieValues = sortedData.map(d => ({ date: d.date, value: d.calories.replace(/[^0-9.]/g, '') }));
   const calorieAverage = computeAverage(calorieValues.map(d => d.value));
-  const calorieTrend = calculateTrendSlope(calorieValues); // Slope in kcal/day
+  const calorieTrend = calculateTrendSlope(calorieValues);
 
-  // Workout Consistency: Count days with workouts
   const workoutDates = new Set(
     workouts
       .filter(w => w.date && normalizeDate(w.date))
@@ -154,11 +144,11 @@ function computeMetrics(allMacros, workouts) {
   }).filter(v => v !== null);
   const daysLogged = workoutValues.reduce((sum, v) => sum + v.value, 0);
   const totalDays = sortedData.length;
-  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null; // Workouts per week
-  const workoutTrend = calculateTrendSlope(workoutValues); // Slope in workouts/day
+  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null;
+  const workoutTrend = calculateTrendSlope(workoutValues);
 
   return {
-    weight: { average: weightAverage, trend: weightTrend ? weightTrend * 7 : null }, // Convert to per week
+    weight: { average: weightAverage, trend: weightTrend ? weightTrend * 7 : null },
     steps: { average: stepsAverage, trend: stepsTrend ? stepsTrend * 7 : null },
     macros: {
       average: { protein: proteinAverage, carbs: carbsAverage, fat: fatAverage },
@@ -171,7 +161,7 @@ function computeMetrics(allMacros, workouts) {
     calories: { average: calorieAverage, trend: calorieTrend ? calorieTrend * 7 : null },
     workouts: {
       average: workoutAverage,
-      trend: workoutTrend ? workoutTrend * 7 : null // Workouts/week
+      trend: workoutTrend ? workoutTrend * 7 : null
     }
   };
 }
@@ -195,8 +185,8 @@ async function runDailySync(isCachePriming = false) {
     const autoplanResult = await autoplan({ workouts, templates, routines });
     console.log('autoplanResult in runDailySync.js:', JSON.stringify(autoplanResult));
 
-    // Ensure todaysWorkout has a title and exercises
-    let todaysWorkout = autoplanResult?.routine?.routine?.[0];
+    // Correctly extract todaysWorkout from autoplanResult
+    let todaysWorkout = autoplanResult?.todaysWorkout;
     console.log('Raw todaysWorkout from autoplanResult:', JSON.stringify(todaysWorkout));
 
     // Strengthened validation
@@ -239,16 +229,13 @@ async function runDailySync(isCachePriming = false) {
     console.log(`📊 All macros fetched: ${allMacros.length} entries`);
 
     console.log("📈 Generating charts...");
-    // Generate charts with original logic (may use 30-day window)
     const weightChartBase = await generateWeightChart(allMacros);
     const stepsChartBase = await generateStepsChart(allMacros);
     const macrosChartBase = await generateMacrosChart(allMacros);
     const calorieChartBase = await generateCaloriesChart(allMacros);
 
-    // Compute full-data averages and trends, passing workouts
     const metrics = computeMetrics(allMacros, workouts);
 
-    // Merge full-data metrics with chart buffers
     const weightChart = {
       buffer: weightChartBase?.buffer || null,
       average: metrics.weight.average ? Math.round(metrics.weight.average) : null,
@@ -274,7 +261,7 @@ async function runDailySync(isCachePriming = false) {
       trend: metrics.calories.trend
     };
     const workoutChart = {
-      buffer: null, // No chart for workouts yet
+      buffer: null,
       average: metrics.workouts.average ? Number(metrics.workouts.average.toFixed(1)) : null,
       trend: metrics.workouts.trend
     };
@@ -328,7 +315,7 @@ async function runDailySync(isCachePriming = false) {
     console.log("📧 Daily email process completed.");
   } catch (err) {
     console.error("❌ runDailySync.js - Daily sync failed:", err.message || err);
-    throw err; // Rethrow to ensure the error is visible in the caller
+    throw err;
   } finally {
     console.log("🏁 runDailySync.js - Daily sync completed.");
   }
