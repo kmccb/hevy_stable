@@ -20,10 +20,27 @@ const { analyzeWorkouts } = require("./trainerUtils");
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.9 – Fixed workout consistency metric");
+console.log("🏷️ runDailySync.js Version: v1.10 – Fixed workout consistency error");
 
 // Log environment variables (mask password for security)
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
+
+/**
+ * Normalizes a date to YYYY-MM-DD format.
+ * @param {string|Date} date - The date to normalize.
+ * @returns {string|null} - Normalized date or null if invalid.
+ */
+function normalizeDate(date) {
+  if (!date) return null;
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().split('T')[0]; // Returns YYYY-MM-DD
+  } catch (e) {
+    console.warn(`Invalid date format: ${date}`);
+    return null;
+  }
+}
 
 /**
  * Calculates the linear regression slope for a dataset.
@@ -69,8 +86,21 @@ function computeMetrics(allMacros, workouts) {
     };
   }
 
-  // Sort by date to ensure chronological order
-  const sortedData = [...allMacros].sort((a, b) => new Date(a.date) - new Date(b.date));
+  // Sort by date and filter out invalid entries
+  const sortedData = allMacros
+    .filter(m => m.date && normalizeDate(m.date))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (!sortedData.length) {
+    console.warn("No valid macro entries with dates");
+    return {
+      weight: { average: null, trend: null },
+      steps: { average: null, trend: null },
+      macros: { average: { protein: null, carbs: null, fat: null }, trend: { protein: null, carbs: null, fat: null } },
+      calories: { average: null, trend: null },
+      workouts: { average: null, trend: null }
+    };
+  }
 
   // Helper to compute average
   const computeAverage = (values) => {
@@ -105,12 +135,24 @@ function computeMetrics(allMacros, workouts) {
   const calorieTrend = calculateTrendSlope(calorieValues); // Slope in kcal/day
 
   // Workout Consistency: Count days with workouts
-  const workoutDates = new Set(workouts.map(w => w.date.split('T')[0])); // Normalize to YYYY-MM-DD
-  const workoutValues = sortedData.map(d => ({
-    date: d.date,
-    value: workoutDates.has(d.date.split('T')[0]) ? 1 : 0
-  }));
-  const daysLogged = workoutValues.filter(w => w.value === 1).length;
+  const workoutDates = new Set(
+    workouts
+      .filter(w => w.date && normalizeDate(w.date))
+      .map(w => normalizeDate(w.date))
+  );
+  console.log(`Workout dates available: ${workoutDates.size} unique days`);
+  const workoutValues = sortedData.map(d => {
+    const normalizedDate = normalizeDate(d.date);
+    if (!normalizedDate) {
+      console.warn(`Skipping macro entry with invalid date: ${JSON.stringify(d)}`);
+      return null;
+    }
+    return {
+      date: d.date,
+      value: workoutDates.has(normalizedDate) ? 1 : 0
+    };
+  }).filter(v => v !== null);
+  const daysLogged = workoutValues.reduce((sum, v) => sum + v.value, 0);
   const totalDays = sortedData.length;
   const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null; // Workouts per week
   const workoutTrend = calculateTrendSlope(workoutValues); // Slope in workouts/day
