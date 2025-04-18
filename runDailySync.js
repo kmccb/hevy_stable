@@ -20,7 +20,7 @@ const { analyzeWorkouts } = require("./trainerUtils");
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.8 – Added workout consistency metric");
+console.log("🏷️ runDailySync.js Version: v1.9 – Fixed workout consistency metric");
 
 // Log environment variables (mask password for security)
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
@@ -54,9 +54,10 @@ function calculateTrendSlope(data) {
 /**
  * Computes averages and trends over all macro data, including workout consistency.
  * @param {Array} allMacros - Array of macro entries.
+ * @param {Array} workouts - Array of workout entries from workouts-30days.json.
  * @returns {Object} - Averages and trends for weight, steps, macros, calories, workouts.
  */
-function computeMetrics(allMacros) {
+function computeMetrics(allMacros, workouts) {
   if (!allMacros || !allMacros.length) {
     console.warn("No macro data for computing metrics");
     return {
@@ -103,10 +104,11 @@ function computeMetrics(allMacros) {
   const calorieAverage = computeAverage(calorieValues.map(d => d.value));
   const calorieTrend = calculateTrendSlope(calorieValues); // Slope in kcal/day
 
-  // Workout Consistency (assumes workoutLogged boolean or presence of workout data)
+  // Workout Consistency: Count days with workouts
+  const workoutDates = new Set(workouts.map(w => w.date.split('T')[0])); // Normalize to YYYY-MM-DD
   const workoutValues = sortedData.map(d => ({
     date: d.date,
-    value: d.workoutLogged ? 1 : 0 // Placeholder; adjust based on actual data
+    value: workoutDates.has(d.date.split('T')[0]) ? 1 : 0
   }));
   const daysLogged = workoutValues.filter(w => w.value === 1).length;
   const totalDays = sortedData.length;
@@ -121,7 +123,7 @@ function computeMetrics(allMacros) {
       trend: {
         protein: proteinTrend ? proteinTrend * 7 : null,
         carbs: carbsTrend ? carbsTrend * 7 : null,
-        fat: fatTrend ? carbsTrend * 7 : null
+        fat: fatTrend ? fatTrend * 7 : null
       }
     },
     calories: { average: calorieAverage, trend: calorieTrend ? calorieTrend * 7 : null },
@@ -201,8 +203,8 @@ async function runDailySync(isCachePriming = false) {
     const macrosChartBase = await generateMacrosChart(allMacros);
     const calorieChartBase = await generateCaloriesChart(allMacros);
 
-    // Compute full-data averages and trends
-    const metrics = computeMetrics(allMacros);
+    // Compute full-data averages and trends, passing workouts
+    const metrics = computeMetrics(allMacros, workouts);
 
     // Merge full-data metrics with chart buffers
     const weightChart = {
