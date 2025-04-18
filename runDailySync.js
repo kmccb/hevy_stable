@@ -13,6 +13,115 @@ const { analyzeWorkouts } = require("./trainerUtils");
 
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
+function calculateTrendSlope(data) {
+  if (!data || data.length < 2) return 0;
+
+  // Convert dates to days since earliest date
+  const earliestDate = new Date(Math.min(...data.map(d => new Date(d.date))));
+  const points = data.map(d => {
+    const days = (new Date(d.date) - earliestDate) / (1000 * 60 * 60 * 24);
+    return { x: days, y: parseFloat(d.value) || 0 };
+  });
+
+  const n = points.length;
+  const sumX = points.reduce((sum, p) => sum + p.x, 0);
+  const sumY = points.reduce((sum, p) => sum + p.y, 0);
+  const sumXY = points.reduce((sum, p) => sum + p.x * p.y, 0);
+  const sumXX = points.reduce((sum, p) => sum + p.x * p.x, 0);
+
+  // Slope = (n * Σ(xy) - Σx * Σy) / (n * Σ(x²) - (Σx)²)
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  return isNaN(slope) ? 0 : slope;
+}
+
+/**
+ * Generates charts and computes averages/trends over all data.
+ * @param {Array} allMacrosData - Array of macro entries.
+ * @returns {Object} - Chart objects with averages and trends.
+ */
+function generateCharts(allMacrosData) {
+  console.log("📈 Generating charts with full data...");
+  if (!allMacrosData || !allMacrosData.length) {
+    console.error("No macro data provided for charts");
+    return {
+      weightChart: { buffer: null, average: null, trend: null },
+      stepsChart: { buffer: null, average: null, trend: null },
+      macrosChart: { buffer: null, average: { protein: null, carbs: null, fat: null }, trend: { protein: null, carbs: null, fat: null } },
+      calorieChart: { buffer: null, average: null, trend: null }
+    };
+  }
+
+  // Sort by date to ensure chronological order
+  const sortedData = [...allMacrosData].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // Helper to compute average
+  const computeAverage = (values) => {
+    const valid = values.filter(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0).map(v => parseFloat(v));
+    return valid.length ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
+  };
+
+  // Weight chart
+  const weightValues = sortedData.map(d => ({ date: d.date, value: d.weight }));
+  const weightAverage = computeAverage(weightValues.map(d => d.value));
+  const weightTrend = calculateTrendSlope(weightValues); // Slope in lbs/day
+
+  // Steps chart
+  const stepsValues = sortedData.map(d => ({ date: d.date, value: d.steps.replace(/[^0-9.]/g, '') }));
+  const stepsAverage = computeAverage(stepsValues.map(d => d.value));
+  const stepsTrend = calculateTrendSlope(stepsValues); // Slope in steps/day
+
+  // Macros chart
+  const proteinValues = sortedData.map(d => ({ date: d.date, value: d.protein }));
+  const carbsValues = sortedData.map(d => ({ date: d.date, value: d.carbs }));
+  const fatValues = sortedData.map(d => ({ date: d.date, value: d.fat }));
+  const proteinAverage = computeAverage(proteinValues.map(d => d.value));
+  const carbsAverage = computeAverage(carbsValues.map(d => d.value));
+  const fatAverage = computeAverage(fatValues.map(d => d.value));
+  const proteinTrend = calculateTrendSlope(proteinValues); // Slope in g/day
+  const carbsTrend = calculateTrendSlope(carbsValues); // Slope in g/day
+  const fatTrend = calculateTrendSlope(fatValues); // Slope in g/day
+
+  // Calorie chart
+  const calorieValues = sortedData.map(d => ({ date: d.date, value: d.calories.replace(/[^0-9.]/g, '') }));
+  const calorieAverage = computeAverage(calorieValues.map(d => d.value));
+  const calorieTrend = calculateTrendSlope(calorieValues); // Slope in kcal/day
+
+  // Placeholder for chart buffers (replace with actual chart generation logic)
+  const generateChartBuffer = () => Buffer.from(""); // Stub; replace with real charting library call
+
+  console.log("📈 Charts generated successfully");
+  return {
+    weightChart: {
+      buffer: generateChartBuffer(),
+      average: weightAverage ? Math.round(weightAverage) : null,
+      trend: weightTrend !== null ? weightTrend * 7 : null // Convert to per week
+    },
+    stepsChart: {
+      buffer: generateChartBuffer(),
+      average: stepsAverage ? Math.round(stepsAverage) : null,
+      trend: stepsTrend !== null ? stepsTrend * 7 : null // Convert to per week
+    },
+    macrosChart: {
+      buffer: generateChartBuffer(),
+      average: {
+        protein: proteinAverage ? Math.round(proteinAverage) : null,
+        carbs: carbsAverage ? Math.round(carbsAverage) : null,
+        fat: fatAverage ? Math.round(fatAverage) : null
+      },
+      trend: {
+        protein: proteinTrend !== null ? proteinTrend * 7 : null,
+        carbs: carbsTrend !== null ? carbsTrend * 7 : null,
+        fat: fatTrend !== null ? fatTrend * 7 : null
+      }
+    },
+    calorieChart: {
+      buffer: generateChartBuffer(),
+      average: calorieAverage ? Math.round(calorieAverage) : null,
+      trend: calorieTrend !== null ? calorieTrend * 7 : null // Convert to per week
+    }
+  };
+}
+
 // Add a version log to confirm this file is loaded
 console.log("🏷️ runDailySync.js Version: v1.6 – Added chart logging");
 
@@ -78,7 +187,7 @@ async function runDailySync(isCachePriming = false) {
     console.log(`📊 Macros fetched: ${JSON.stringify(macros)}`);
 
     console.log("📊 Fetching all macros...");
-    const allMacros = await getAllMacrosFromSheet();
+    const allMacros = await fetchAllMacros();
     console.log(`📊 All macros fetched: ${allMacros.length} entries`);
 
     console.log("📈 Generating charts...");
