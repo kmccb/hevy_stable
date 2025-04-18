@@ -1,4 +1,4 @@
-const COACH_GPT_VERSION = 'v1.4 – Weekly Split + Recovery + Supersets + Variety';
+const COACH_GPT_VERSION = 'v1.5 – Balanced pull exercises';
 console.log(`🏷️ autoplan.js - CoachGPT Version: ${COACH_GPT_VERSION}`);
 
 const axios = require('axios');
@@ -235,17 +235,12 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const usedTitles = new Set();
   const selectedExercises = [];
 
-  // Prioritize undertrained muscles
-  const sortedMuscleGroups = [...muscleGroups].sort((a, b) => {
-    const freqA = historyAnalysis.muscleGroupFrequency[a.toLowerCase()] || 0;
-    const freqB = historyAnalysis.muscleGroupFrequency[b.toLowerCase()] || 0;
-    return freqA - freqB;
-  });
+  // Prioritize lats for pull to avoid bicep bias
+  const sortedMuscleGroups = ['Lats', ...muscleGroups.filter(m => m !== 'Lats')];
 
-  const fiveDaysAgo = new Date();
-  fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5); // Relaxed freshness
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // Try each muscle group
   for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
     const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
     let candidates = templates.filter(t => {
@@ -253,41 +248,42 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       let isRecent = recentTitles.has(t.title);
       if (workouts && workouts.length > 0) {
         const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-        isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
+        isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
       }
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // Fallback to any pull muscle if needed
-    if (candidates.length === 0 && muscleGroups.includes(muscle)) {
+    if (candidates.length === 0) {
       console.log(`⚠️ No suitable template found for ${muscle}. Falling back to any Pull muscle.`);
       candidates = templates.filter(t => {
         const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
         let isRecent = recentTitles.has(t.title);
         if (workouts && workouts.length > 0) {
           const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-          isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
+          isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
         }
         return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
       });
     }
 
     if (candidates.length > 0) {
+      const nonBicep = candidates.filter(t => !(t.primary_muscle_group || '').toLowerCase().includes('biceps'));
+      const finalCandidates = nonBicep.length > 0 && muscle !== 'Biceps' ? nonBicep : candidates;
+
       const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
-      candidates.sort((a, b) => {
+      finalCandidates.sort((a, b) => {
         const aIsNewEquipment = usedEquipment.has(a.equipment) ? 1 : 0;
         const bIsNewEquipment = usedEquipment.has(b.equipment) ? 1 : 0;
         return aIsNewEquipment - bIsNewEquipment;
       });
 
-      const selected = candidates[0];
+      const selected = finalCandidates[0];
       const progression = progressionAnalysis[selected.title];
       const note = progression
         ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
         : "Start moderate and build";
 
       console.log(`✅ Selected: ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
-
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
@@ -298,7 +294,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     }
   }
 
-  // Fill remaining slots
   while (selectedExercises.length < numExercises) {
     const muscle = sortedMuscleGroups[Math.floor(Math.random() * sortedMuscleGroups.length)];
     let candidates = templates.filter(t => {
@@ -306,12 +301,11 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       let isRecent = recentTitles.has(t.title);
       if (workouts && workouts.length > 0) {
         const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-        isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
+        isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
       }
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // Fallback to any pull muscle
     if (candidates.length === 0) {
       console.log(`⚠️ No more suitable templates found for ${muscle}. Falling back to any Pull muscle.`);
       candidates = templates.filter(t => {
@@ -319,7 +313,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
         let isRecent = recentTitles.has(t.title);
         if (workouts && workouts.length > 0) {
           const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-          isRecent = lastUsed && new Date(lastUsed) > fiveDaysAgo;
+          isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
         }
         return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
       });
@@ -330,21 +324,23 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       break;
     }
 
+    const nonBicep = candidates.filter(t => !(t.primary_muscle_group || '').toLowerCase().includes('biceps'));
+    const finalCandidates = nonBicep.length > 0 && muscle !== 'Biceps' ? nonBicep : candidates;
+
     const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
-    candidates.sort((a, b) => {
+    finalCandidates.sort((a, b) => {
       const aIsNewEquipment = usedEquipment.has(a.equipment) ? 1 : 0;
       const bIsNewEquipment = usedEquipment.has(b.equipment) ? 1 : 0;
       return aIsNewEquipment - bIsNewEquipment;
     });
 
-    const selected = candidates[0];
+    const selected = finalCandidates[0];
     const progression = progressionAnalysis[selected.title];
     const note = progression
       ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
       : "Start moderate and build";
 
     console.log(`✅ Selected (additional): ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
-
     selectedExercises.push({ ...selected, note });
     usedTitles.add(selected.title);
   }
@@ -379,7 +375,6 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
       return primaryMatch && titleMatch && !usedTitles.has(t.title) && !isRecent;
     });
 
-    // Fallback to any abs/obliques exercise
     if (candidates.length === 0) {
       console.log(`⚠️ No specific abs template found for ${muscle}. Falling back to any abs exercise.`);
       candidates = templates.filter(t => {
@@ -461,7 +456,6 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   const allExercises = [];
   const usedExerciseIds = new Set();
 
-  // Supersets (aim for 2–3)
   const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 3);
   for (let i = 0; i < supersetPairs; i++) {
     if (i >= validExercises.length || i >= validAbsExercises.length) break;
@@ -499,7 +493,6 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     usedExerciseIds.add(abs.id);
   }
 
-  // Strength finishers (up to 2)
   const remainingStrengths = validExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 2);
   for (const ex of remainingStrengths) {
     const weight = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
@@ -518,7 +511,6 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 7) break;
   }
 
-  // Abs finisher (up to 1)
   const remainingAbs = validAbsExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 1);
   for (const abs of remainingAbs) {
     const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
@@ -537,7 +529,6 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     if (allExercises.length >= 8) break;
   }
 
-  // Pad to 6–8
   if (allExercises.length < 6) {
     const extra = validExercises.concat(validAbsExercises)
       .filter(ex => !usedExerciseIds.has(ex.id))
@@ -558,13 +549,11 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     }
   }
 
-  // Cap at 8
   if (allExercises.length > 8) {
     allExercises.length = 8;
     console.warn("⚠️ Routine trimmed to 8 exercises.");
   }
 
-  // Deduplicate
   const deduped = [];
   const seenIds = new Set();
   for (const ex of allExercises) {
@@ -799,7 +788,6 @@ async function autoplan({ workouts, templates, routines }) {
       }
     }
 
-    // Validate routine has 6–8 exercises (except Cardio)
     let exercises = [];
     if (Array.isArray(routine)) {
       exercises = routine[0]?.exercises || [];
@@ -820,7 +808,6 @@ async function autoplan({ workouts, templates, routines }) {
       }
     }
 
-    // Format todaysWorkout
     const todaysWorkout = {
       id: Array.isArray(routine) ? routine[0]?.id : routine.id,
       title: Array.isArray(routine) ? routine[0]?.title : (routine.title || routine.routine?.title),
