@@ -169,11 +169,12 @@ function getExerciseTrend(workouts, exerciseTitle) {
  * @param {Object} allMacrosData - Historical macros data.
  * @param {Object} macrosChart - Average macro trends.
  * @param {Object} stepsChart - Average step trends.
+ * @param {Object} calorieChart - Average calorie trends.
  * @param {Object} todaysWorkout - Today's planned workout.
  * @param {string} userFeedback - User's feedback on how they're feeling.
  * @returns {string} - HTML string of tailored tips.
  */
-function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback = "refreshed") {
+function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, calorieChart, todaysWorkout, userFeedback = "refreshed") {
   console.log("Entering generateCoachTips with todaysWorkout:", JSON.stringify(todaysWorkout));
 
   if (!todaysWorkout || typeof todaysWorkout !== 'object') {
@@ -188,7 +189,7 @@ function generateCoachTips(trainerInsights, workouts, macros, allMacrosData, mac
 
   const tips = [];
   const yesterdayCalories = estimateCalories(macros);
-  const avgCalories = parseFloat(macrosChart?.average?.calories) || 1788;
+  const avgCalories = calorieChart?.average ? Math.round(parseFloat(calorieChart.average)) : 1784;
   const avgProtein = parseFloat(macrosChart?.average?.protein) || 178;
   const avgSteps = parseFloat(stepsChart?.average) || 11462;
   const yesterdaySteps = parseFloat(macros.steps?.replace(/[^0-9.]/g, '') || 0);
@@ -299,7 +300,7 @@ function generateHtmlSummary(
   `).join("<br>") : "<p>No workout logged yesterday. Ready to crush it today?</p>";
 
   const userFeedback = "refreshed";
-  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, todaysWorkout, userFeedback);
+  const coachTips = generateCoachTips(trainerInsights, workouts, macros, allMacrosData, macrosChart, stepsChart, calorieChart, todaysWorkout, userFeedback);
 
   console.log("After generateCoachTips - todaysWorkout exists:", !!todaysWorkout);
   console.log("After generateCoachTips - todaysWorkout.title:", todaysWorkout ? todaysWorkout.title : 'undefined');
@@ -422,6 +423,14 @@ async function sendDailyEmail(workouts, macros, allMacrosData, trainerInsights, 
     );
     console.log("✍️ Email HTML generated successfully");
 
+    // Log buffer sizes for debugging
+    console.log("📎 Chart buffer sizes:", {
+      weightChart: charts.weightChart?.buffer?.length || 0,
+      stepsChart: charts.stepsChart?.buffer?.length || 0,
+      macrosChart: charts.macrosChart?.buffer?.length || 0,
+      calorieChart: charts.calorieChart?.buffer?.length || 0
+    });
+
     console.log("📧 Sending email...");
     await transporter.sendMail({
       from: EMAIL_USER,
@@ -432,7 +441,7 @@ async function sendDailyEmail(workouts, macros, allMacrosData, trainerInsights, 
         { filename: "weight.png", content: charts.weightChart?.buffer || Buffer.from(''), cid: "weightChart" },
         { filename: "steps.png", content: charts.stepsChart?.buffer || Buffer.from(''), cid: "stepsChart" },
         { filename: "macros.png", content: charts.macrosChart?.buffer || Buffer.from(''), cid: "macrosChart" },
-        { filename: "calories.png", content: charts.caloriesChart?.buffer || Buffer.from(''), cid: "caloriesChart" }
+        { filename: "calories.png", content: charts.calorieChart?.buffer || Buffer.from(''), cid: "caloriesChart" }
       ]
     });
     console.log("✅ Daily summary sent!");
