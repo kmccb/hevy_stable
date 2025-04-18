@@ -19,23 +19,52 @@ const { analyzeWorkouts } = require("./trainerUtils");
 
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
-console.log("🏷️ runDailySync.js Version: v1.13 – Workaround for calorie chart");
+console.log("🏷️ runDailySync.js Version: v1.14 – Fix workout consistency calculation");
 
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
 
 /**
- * Normalizes a date to YYYY-MM-DD format.
+ * Normalizes a date to YYYY-MM-DD format, supporting multiple input formats.
  * @param {string|Date} date - The date to normalize.
  * @returns {string|null} - Normalized date or null if invalid.
  */
 function normalizeDate(date) {
-  if (!date) return null;
+  if (!date) {
+    console.warn("normalizeDate: Date is null or undefined");
+    return null;
+  }
+
   try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return null;
+    let d;
+    if (date instanceof Date) {
+      d = date;
+    } else {
+      // Try parsing as ISO format (YYYY-MM-DD) or other common formats
+      const isoMatch = String(date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const usMatch = String(date).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      const shortIsoMatch = String(date).match(/^(\d{4})(\d{2})(\d{2})$/);
+
+      if (isoMatch) {
+        d = new Date(date);
+      } else if (usMatch) {
+        // Handle MM/DD/YYYY format
+        d = new Date(`${usMatch[3]}-${usMatch[1]}-${usMatch[2]}`);
+      } else if (shortIsoMatch) {
+        // Handle YYYYMMDD format
+        d = new Date(`${shortIsoMatch[1]}-${shortIsoMatch[2]}-${shortIsoMatch[3]}`);
+      } else {
+        // Try parsing as a general date string
+        d = new Date(date);
+      }
+    }
+
+    if (isNaN(d.getTime())) {
+      console.warn(`normalizeDate: Invalid date format: ${date}`);
+      return null;
+    }
     return d.toISOString().split('T')[0];
   } catch (e) {
-    console.warn(`Invalid date format: ${date}`);
+    console.warn(`normalizeDate: Error parsing date: ${date}, Error: ${e.message}`);
     return null;
   }
 }
@@ -125,12 +154,21 @@ function computeMetrics(allMacros, workouts) {
   const calorieAverage = computeAverage(calorieValues.map(d => d.value));
   const calorieTrend = calculateTrendSlope(calorieValues);
 
+  // Enhanced logging for workout dates
+  console.log("🔍 Raw workout entries:", workouts.map(w => ({ id: w.id, date: w.date })));
   const workoutDates = new Set(
     workouts
-      .filter(w => w.date && normalizeDate(w.date))
+      .filter(w => {
+        const normalized = normalizeDate(w.date);
+        if (!normalized) {
+          console.warn(`Skipping workout with invalid date: ${JSON.stringify(w)}`);
+        }
+        return normalized;
+      })
       .map(w => normalizeDate(w.date))
   );
-  console.log(`Workout dates available: ${workoutDates.size} unique days`);
+  console.log(`Workout dates available: ${workoutDates.size} unique days`, Array.from(workoutDates));
+
   const workoutValues = sortedData.map(d => {
     const normalizedDate = normalizeDate(d.date);
     if (!normalizedDate) {
@@ -144,7 +182,7 @@ function computeMetrics(allMacros, workouts) {
   }).filter(v => v !== null);
   const daysLogged = workoutValues.reduce((sum, v) => sum + v.value, 0);
   const totalDays = sortedData.length;
-  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null;
+  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null;
   const workoutTrend = calculateTrendSlope(workoutValues);
 
   return {
@@ -171,8 +209,8 @@ async function runDailySync(isCachePriming = false) {
     console.log(`🔁 Running daily sync... [runDailySync.js] (isCachePriming: ${isCachePriming})`);
 
     console.log("📂 Fetching cache data...");
-    await fetchAllExercises();
     await fetchAllWorkouts();
+    await fetchAllExercises();
     await fetchAllRoutines();
 
     console.log("📂 Reading cache files...");
