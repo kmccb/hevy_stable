@@ -275,7 +275,7 @@ function generateHtmlSummary(
     console.error("Error: todaysWorkout is invalid in generateHtmlSummary:", todaysWorkout);
     return `
       <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1:6;">
-        <h2 style="color: #2c3e50; font-size: 24px;">Hey ${userName}! Here's Your Daily Fitness Update</h2>
+        <h2 style="color: #2c3e50; font-size: 24px;">What up, Tom! Here's Your Daily Fitness Update</h2>
         <p style="font-size: 16px;">Looks like we couldn't plan a workout for today—let's focus on recovery!</p>
         <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
       </div>
@@ -391,7 +391,6 @@ function generateHtmlSummary(
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">A Little Inspiration</h3>
       <p style="font-style: italic; color: #555;">"${quoteText}"</p>
       <p style="font-size: 16px;">You’ve got this! Keep pushing, and I’m here cheering you on.</p>
-      <p style="font-size: 14px; color: #666;">Got feedback? Let me know: <a href="https://forms.gle/yourformlink">here</a></p>
       <p style="font-size: 16px; margin-top: 20px;">– Your CoachGPT</p>
     </div>
   `;

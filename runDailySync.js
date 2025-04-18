@@ -19,8 +19,7 @@ const { analyzeWorkouts } = require("./trainerUtils");
 
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
-// Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.11 – Fixed todaysWorkout extraction");
+console.log("🏷️ runDailySync.js Version: v1.12 – Debug calorie chart issue");
 
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
 
@@ -121,7 +120,8 @@ function computeMetrics(allMacros, workouts) {
   const carbsTrend = calculateTrendSlope(carbsValues);
   const fatTrend = calculateTrendSlope(fatValues);
 
-  const calorieValues = sortedData.map(d => ({ date: d.date, value: d.calories.replace(/[^0-9.]/g, '') }));
+  const calorieValues = sortedData.map(d => ({ date: d.date, value: d.calories ? d.calories.replace(/[^0-9.]/g, '') : null }));
+  console.log("🔍 Calorie data for chart:", calorieValues.filter(v => v.value !== null && v.value !== ""));
   const calorieAverage = computeAverage(calorieValues.map(d => d.value));
   const calorieTrend = calculateTrendSlope(calorieValues);
 
@@ -185,11 +185,9 @@ async function runDailySync(isCachePriming = false) {
     const autoplanResult = await autoplan({ workouts, templates, routines });
     console.log('autoplanResult in runDailySync.js:', JSON.stringify(autoplanResult));
 
-    // Correctly extract todaysWorkout from autoplanResult
     let todaysWorkout = autoplanResult?.todaysWorkout;
     console.log('Raw todaysWorkout from autoplanResult:', JSON.stringify(todaysWorkout));
 
-    // Strengthened validation
     if (!todaysWorkout || typeof todaysWorkout !== 'object' || !todaysWorkout.id) {
       console.warn("Warning: todaysWorkout is invalid after autoplan (missing object or id). Using fallback.");
       todaysWorkout = { title: "Rest Day", exercises: [], id: "fallback-id" };
@@ -204,7 +202,6 @@ async function runDailySync(isCachePriming = false) {
     }
     console.log('Validated todaysWorkout in runDailySync.js:', JSON.stringify(todaysWorkout));
 
-    // Skip email generation during cache priming or if todaysWorkout is invalid
     if (isCachePriming) {
       console.log("Skipping email generation during cache priming.");
       return;
@@ -232,7 +229,14 @@ async function runDailySync(isCachePriming = false) {
     const weightChartBase = await generateWeightChart(allMacros);
     const stepsChartBase = await generateStepsChart(allMacros);
     const macrosChartBase = await generateMacrosChart(allMacros);
-    const calorieChartBase = await generateCaloriesChart(allMacros);
+    let calorieChartBase;
+    try {
+      calorieChartBase = await generateCaloriesChart(allMacros);
+      console.log("🔍 Calorie chart buffer generated:", calorieChartBase?.buffer ? "Buffer exists" : "Buffer is null");
+    } catch (err) {
+      console.error("❌ Error generating calorie chart:", err.message);
+      calorieChartBase = { buffer: null };
+    }
 
     const metrics = computeMetrics(allMacros, workouts);
 
