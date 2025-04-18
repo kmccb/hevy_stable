@@ -20,7 +20,7 @@ const { analyzeWorkouts } = require("./trainerUtils");
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
 // Add a version log to confirm this file is loaded
-console.log("🏷️ runDailySync.js Version: v1.7 – Added trends and full-data averages");
+console.log("🏷️ runDailySync.js Version: v1.8 – Added workout consistency metric");
 
 // Log environment variables (mask password for security)
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
@@ -52,9 +52,9 @@ function calculateTrendSlope(data) {
 }
 
 /**
- * Computes averages and trends over all macro data.
+ * Computes averages and trends over all macro data, including workout consistency.
  * @param {Array} allMacros - Array of macro entries.
- * @returns {Object} - Averages and trends for weight, steps, macros, calories.
+ * @returns {Object} - Averages and trends for weight, steps, macros, calories, workouts.
  */
 function computeMetrics(allMacros) {
   if (!allMacros || !allMacros.length) {
@@ -63,7 +63,8 @@ function computeMetrics(allMacros) {
       weight: { average: null, trend: null },
       steps: { average: null, trend: null },
       macros: { average: { protein: null, carbs: null, fat: null }, trend: { protein: null, carbs: null, fat: null } },
-      calories: { average: null, trend: null }
+      calories: { average: null, trend: null },
+      workouts: { average: null, trend: null }
     };
   }
 
@@ -72,7 +73,7 @@ function computeMetrics(allMacros) {
 
   // Helper to compute average
   const computeAverage = (values) => {
-    const valid = values.filter(v => !isNaN(parseFloat(v)) && parseFloat(v) > 0).map(v => parseFloat(v));
+    const valid = values.filter(v => !isNaN(parseFloat(v)) && parseFloat(v) >= 0).map(v => parseFloat(v));
     return valid.length ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
   };
 
@@ -102,6 +103,16 @@ function computeMetrics(allMacros) {
   const calorieAverage = computeAverage(calorieValues.map(d => d.value));
   const calorieTrend = calculateTrendSlope(calorieValues); // Slope in kcal/day
 
+  // Workout Consistency (assumes workoutLogged boolean or presence of workout data)
+  const workoutValues = sortedData.map(d => ({
+    date: d.date,
+    value: d.workoutLogged ? 1 : 0 // Placeholder; adjust based on actual data
+  }));
+  const daysLogged = workoutValues.filter(w => w.value === 1).length;
+  const totalDays = sortedData.length;
+  const workoutAverage = totalDays > 0 ? (daysLogged / totalDays) * 7 : null; // Workouts per week
+  const workoutTrend = calculateTrendSlope(workoutValues); // Slope in workouts/day
+
   return {
     weight: { average: weightAverage, trend: weightTrend ? weightTrend * 7 : null }, // Convert to per week
     steps: { average: stepsAverage, trend: stepsTrend ? stepsTrend * 7 : null },
@@ -110,10 +121,14 @@ function computeMetrics(allMacros) {
       trend: {
         protein: proteinTrend ? proteinTrend * 7 : null,
         carbs: carbsTrend ? carbsTrend * 7 : null,
-        fat: fatTrend ? fatTrend * 7 : null
+        fat: fatTrend ? carbsTrend * 7 : null
       }
     },
-    calories: { average: calorieAverage, trend: calorieTrend ? calorieTrend * 7 : null }
+    calories: { average: calorieAverage, trend: calorieTrend ? calorieTrend * 7 : null },
+    workouts: {
+      average: workoutAverage,
+      trend: workoutTrend ? workoutTrend * 7 : null // Workouts/week
+    }
   };
 }
 
@@ -214,13 +229,19 @@ async function runDailySync(isCachePriming = false) {
       average: metrics.calories.average ? Math.round(metrics.calories.average) : null,
       trend: metrics.calories.trend
     };
+    const workoutChart = {
+      buffer: null, // No chart for workouts yet
+      average: metrics.workouts.average ? Number(metrics.workouts.average.toFixed(1)) : null,
+      trend: metrics.workouts.trend
+    };
 
     console.log("📈 Charts generated successfully");
     console.log("📈 Chart objects:", {
       weightChart: { buffer: !!weightChart.buffer, average: weightChart.average, trend: weightChart.trend },
       stepsChart: { buffer: !!stepsChart.buffer, average: stepsChart.average, trend: stepsChart.trend },
       macrosChart: { buffer: !!macrosChart.buffer, average: macrosChart.average, trend: macrosChart.trend },
-      calorieChart: { buffer: !!calorieChart.buffer, average: calorieChart.average, trend: calorieChart.trend }
+      calorieChart: { buffer: !!calorieChart.buffer, average: calorieChart.average, trend: calorieChart.trend },
+      workoutChart: { buffer: !!workoutChart.buffer, average: workoutChart.average, trend: workoutChart.trend }
     });
 
     console.log("🧠 Generating trainer insights...");
@@ -254,7 +275,8 @@ async function runDailySync(isCachePriming = false) {
         weightChart,
         stepsChart,
         macrosChart,
-        calorieChart
+        calorieChart,
+        workoutChart
       },
       todaysWorkout,
       quoteText

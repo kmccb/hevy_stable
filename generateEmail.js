@@ -266,7 +266,7 @@ function generateHtmlSummary(
   todaysWorkout,
   quoteText
 ) {
-  const { weightChart, stepsChart, macrosChart, calorieChart } = charts;
+  const { weightChart, stepsChart, macrosChart, calorieChart, workoutChart } = charts;
   const userName = process.env.EMAIL_USER ? process.env.EMAIL_USER.split('@')[0] : 'there';
 
   console.log("todaysWorkout in generateHtmlSummary (before coachTips):", JSON.stringify(todaysWorkout));
@@ -282,14 +282,15 @@ function generateHtmlSummary(
     `;
   }
 
-  const weightChange = (() => {
+  // Calculate overall weight change for Progress Over Time
+  const weightStatus = (() => {
     const validWeights = allMacrosData
       .map(m => parseFloat(m.weight))
       .filter(w => !isNaN(w));
-    if (validWeights.length < 2) return null;
+    if (validWeights.length < 2) return "";
     const delta = validWeights.at(-1) - validWeights[0];
-    const direction = delta < 0 ? "dropped" : "gained";
-    return `You've ${direction} ${Math.abs(delta).toFixed(1)} lbs overall.`;
+    const direction = delta < 0 ? "down" : "up";
+    return `You're ${direction} ${Math.abs(delta).toFixed(1)} lbs since you started this journey.`;
   })();
 
   const workoutBlock = workouts.length > 0 ? workouts.map(w => `
@@ -321,7 +322,8 @@ function generateHtmlSummary(
     weightChart: { buffer: !!weightChart?.buffer, average: weightChart?.average, trend: weightChart?.trend },
     stepsChart: { buffer: !!stepsChart?.buffer, average: stepsChart?.average, trend: stepsChart?.trend },
     macrosChart: { buffer: !!macrosChart?.buffer, average: macrosChart?.average, trend: macrosChart?.trend },
-    calorieChart: { buffer: !!calorieChart?.buffer, average: calorieChart?.average, trend: calorieChart?.trend }
+    calorieChart: { buffer: !!calorieChart?.buffer, average: calorieChart?.average, trend: calorieChart?.trend },
+    workoutChart: { buffer: !!workoutChart?.buffer, average: workoutChart?.average, trend: workoutChart?.trend }
   });
 
   const stepsAvg = stepsChart && typeof stepsChart.average === 'number' ? formatNumber(stepsChart.average) : 'N/A';
@@ -329,6 +331,7 @@ function generateHtmlSummary(
   const macrosCarbs = macrosChart?.average?.carbs ? formatNumber(macrosChart.average.carbs) : 'N/A';
   const macrosFat = macrosChart?.average?.fat ? formatNumber(macrosChart.average.fat) : 'N/A';
   const calorieAvg = calorieChart && typeof calorieChart.average === 'number' ? formatNumber(calorieChart.average) : 'N/A';
+  const workoutAvg = workoutChart && typeof workoutChart.average === 'number' ? workoutChart.average.toFixed(1) : 'N/A';
 
   // Format trends
   const weightTrend = formatTrend(weightChart?.trend, "lbs", "weight");
@@ -337,9 +340,10 @@ function generateHtmlSummary(
   const proteinTrend = formatTrend(macrosChart?.trend?.protein, "g", "protein intake");
   const carbsTrend = formatTrend(macrosChart?.trend?.carbs, "g", "carb intake");
   const fatTrend = formatTrend(macrosChart?.trend?.fat, "g", "fat intake");
+  const workoutTrend = formatTrend(workoutChart?.trend, "workouts", "workout consistency");
 
-  console.log("Computed chart values:", { stepsAvg, macrosProtein, macrosCarbs, macrosFat, calorieAvg });
-  console.log("Computed trends:", { weightTrend, stepsTrend, calorieTrend, proteinTrend, carbsTrend, fatTrend });
+  console.log("Computed chart values:", { stepsAvg, macrosProtein, macrosCarbs, macrosFat, calorieAvg, workoutAvg });
+  console.log("Computed trends:", { weightTrend, stepsTrend, calorieTrend, proteinTrend, carbsTrend, fatTrend, workoutTrend });
 
   return `
     <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; line-height: 1:6;">
@@ -356,14 +360,14 @@ function generateHtmlSummary(
         <li><strong>Protein</strong>: ${formatNumber(macroValues.protein)}g</li>
         <li><strong>Carbs</strong>: ${formatNumber(macroValues.carbs)}g</li>
         <li><strong>Fat</strong>: ${formatNumber(macroValues.fat)}g</li>
-        <li><strong>Weight</strong>: ${formatNumber(macroValues.weight)} lbs ${weightChange ? `(${weightChange})` : ""}</li>
+        <li><strong>Weight</strong>: ${formatNumber(macroValues.weight)} lbs</li>
         <li><strong>Steps</strong>: ${formatNumber(macroValues.steps)}</li>
       </ul>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Progress Over Time</h3>
       <p>Here’s how your metrics are trending based on all your data:</p>
       <ul style="list-style-type: disc; padding-left: 20px;">
-        <li><strong>Weight</strong>: Averaging ${formatNumber(weightChart?.average)} lbs. ${weightTrend}</li>
+        <li><strong>Weight</strong>: ${weightStatus} Averaging ${formatNumber(weightChart?.average)} lbs. ${weightTrend}</li>
         ${weightChart?.buffer ? '<img src="cid:weightChart" alt="Weight chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Weight chart unavailable.</p>'}
         <li><strong>Steps</strong>: Averaging ${stepsAvg} steps/day. ${stepsTrend}</li>
         ${stepsChart?.buffer ? '<img src="cid:stepsChart" alt="Steps chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Steps chart unavailable.</p>'}
@@ -374,6 +378,7 @@ function generateHtmlSummary(
         ${macrosChart?.buffer ? '<img src="cid:macrosChart" alt="Macros chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Macros chart unavailable.</p>'}
         <li><strong>Calories</strong>: Averaging ${calorieAvg} kcal/day. ${calorieTrend}</li>
         ${calorieChart?.buffer ? '<img src="cid:caloriesChart" alt="Calories chart" style="max-width: 100%; margin: 10px 0;">' : '<p>Calories chart unavailable.</p>'}
+        <li><strong>Workout Consistency</strong>: Averaging ${workoutAvg} workouts/week. ${workoutTrend}</li>
       </ul>
 
       <h3 style="color: #2c3e50; font-size: 20px; margin-top: 20px;">Your Coach’s Tips</h3>
@@ -428,7 +433,7 @@ async function sendDailyEmail(workouts, macros, allMacrosData, trainerInsights, 
         { filename: "weight.png", content: charts.weightChart?.buffer || Buffer.from(''), cid: "weightChart" },
         { filename: "steps.png", content: charts.stepsChart?.buffer || Buffer.from(''), cid: "stepsChart" },
         { filename: "macros.png", content: charts.macrosChart?.buffer || Buffer.from(''), cid: "macrosChart" },
-        { filename: "calories.png", content: charts.calorieChart?.buffer || Buffer.from(''), cid: "caloriesChart" }
+        { filename: "calories.png", content: charts.caloriesChart?.buffer || Buffer.from(''), cid: "caloriesChart" }
       ]
     });
     console.log("✅ Daily summary sent!");
