@@ -19,7 +19,7 @@ const { analyzeWorkouts } = require("./trainerUtils");
 
 const { EMAIL_USER, EMAIL_PASS } = process.env;
 
-console.log("🏷️ runDailySync.js Version: v1.12 – Debug calorie chart issue");
+console.log("🏷️ runDailySync.js Version: v1.13 – Workaround for calorie chart");
 
 console.log(`📧 Email configuration - From: ${EMAIL_USER}, Password set: ${EMAIL_PASS ? 'Yes' : 'No'}`);
 
@@ -233,6 +233,11 @@ async function runDailySync(isCachePriming = false) {
     try {
       calorieChartBase = await generateCaloriesChart(allMacros);
       console.log("🔍 Calorie chart buffer generated:", calorieChartBase?.buffer ? "Buffer exists" : "Buffer is null");
+      // Temporary workaround: Check buffer size and validity
+      if (calorieChartBase?.buffer && calorieChartBase.buffer.length < 1000) {
+        console.warn("Warning: Calorie chart buffer is suspiciously small. Setting to null as workaround.");
+        calorieChartBase.buffer = null;
+      }
     } catch (err) {
       console.error("❌ Error generating calorie chart:", err.message);
       calorieChartBase = { buffer: null };
