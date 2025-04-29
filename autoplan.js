@@ -241,6 +241,33 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+  // 🆕 New heavy leg exercise keywords
+  const prioritizedLegExercises = [
+    "leg press",
+    "goblet squat",
+    "split squat",
+    "dumbbell squat",
+    "barbell squat",
+    "romanian deadlift",
+    "rdl",
+    "glute bridge",
+    "hip thrust",
+    "lunge",
+    "step up",
+    "leg curl",
+    "seated leg curl",
+    "lying leg curl",
+    "leg extension",
+    "calf raise"
+  ];
+
+  const isLegDay = muscleGroups.includes('Quads') || muscleGroups.includes('Hamstrings') || muscleGroups.includes('Glutes') || muscleGroups.includes('Calves');
+
+  const prioritizeHeavyLegs = (title) => {
+    const lowered = title.toLowerCase();
+    return prioritizedLegExercises.some(keyword => lowered.includes(keyword));
+  };
+
   for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
     const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
     let candidates = templates.filter(t => {
@@ -253,25 +280,17 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-     // 🆕 Extra Filter for Leg Days (Real Machine Lifts First)
-     if (muscleGroups.includes('Quads') || muscleGroups.includes('Hamstrings') || muscleGroups.includes('Glutes') || muscleGroups.includes('Calves')) {
-      const prioritizeMachine = candidates.filter(t => {
-        const title = t.title.toLowerCase();
-        return title.includes('leg press') ||
-               title.includes('leg extension') ||
-               title.includes('leg curl') ||
-               title.includes('seated leg curl') ||
-               title.includes('lying leg curl') ||
-               title.includes('calf raise');
-      });
-      if (prioritizeMachine.length > 0) {
-        candidates = prioritizeMachine;
-        console.log(`✅ Prioritizing machine-based leg exercises for Legs day.`);
+    // 🆕 Updated for all heavy weighted leg movements (not just machines)
+    if (isLegDay) {
+      const prioritizeHeavy = candidates.filter(t => prioritizeHeavyLegs(t.title));
+      if (prioritizeHeavy.length > 0) {
+        candidates = prioritizeHeavy;
+        console.log(`✅ Prioritizing heavy weighted leg exercises for Legs day.`);
       }
     }
 
     if (candidates.length === 0) {
-      console.log(`⚠️ No suitable template found for ${muscle}. Falling back to any Pull muscle.`);
+      console.log(`⚠️ No suitable template found for ${muscle}. Falling back to any muscle group.`);
       candidates = templates.filter(t => {
         const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
         let isRecent = recentTitles.has(t.title);
@@ -311,6 +330,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     }
   }
 
+  // If still missing exercises, random fill
   while (selectedExercises.length < numExercises) {
     const muscle = sortedMuscleGroups[Math.floor(Math.random() * sortedMuscleGroups.length)];
     let candidates = templates.filter(t => {
@@ -324,7 +344,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     });
 
     if (candidates.length === 0) {
-      console.log(`⚠️ No more suitable templates found for ${muscle}. Falling back to any Pull muscle.`);
+      console.log(`⚠️ No more suitable templates found for ${muscle}. Falling back to any muscle group.`);
       candidates = templates.filter(t => {
         const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
         let isRecent = recentTitles.has(t.title);
@@ -364,6 +384,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
 
   return selectedExercises;
 }
+
 
 function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
   const absMuscles = ['abdominals', 'obliques'];
