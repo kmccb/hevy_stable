@@ -235,37 +235,48 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const usedTitles = new Set();
   const selectedExercises = [];
 
-  // Prioritize lats for pull to avoid bicep bias
+  // Prioritize lats for pull days
   const sortedMuscleGroups = ['Lats', ...muscleGroups.filter(m => m !== 'Lats')];
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // 🆕 New heavy leg exercise keywords
-  const prioritizedLegExercises = [
+  // 🆕 Define heavy quad/glute exercises manually
+  const heavyLegKeywords = [
     "leg press",
-    "goblet squat",
-    "split squat",
-    "dumbbell squat",
-    "barbell squat",
-    "romanian deadlift",
-    "rdl",
-    "glute bridge",
-    "hip thrust",
+    "squat",
     "lunge",
     "step up",
+    "split squat",
+    "front squat",
+    "box squat",
+    "goblet squat",
+    "hack squat",
+    "zercher squat",
+    "pendulum squat",
+    "sumo squat",
+    "overhead dumbbell lunge",
+    "bulgarian split squat",
+    "walking lunge",
+    "curtsy lunge",
+    "leg extension",
     "leg curl",
     "seated leg curl",
     "lying leg curl",
-    "leg extension",
-    "calf raise"
+    "hip thrust",
+    "glute bridge",
+    "romanian deadlift",
+    "rdl",
+    "calf raise",
+    "single leg press",
+    "single leg extension"
   ];
 
-  const isLegDay = muscleGroups.includes('Quads') || muscleGroups.includes('Hamstrings') || muscleGroups.includes('Glutes') || muscleGroups.includes('Calves');
+  const isLegDay = muscleGroups.includes('Quads') || muscleGroups.includes('Glutes') || muscleGroups.includes('Hamstrings') || muscleGroups.includes('Calves');
 
-  const prioritizeHeavyLegs = (title) => {
-    const lowered = title.toLowerCase();
-    return prioritizedLegExercises.some(keyword => lowered.includes(keyword));
+  const isHeavyLegExercise = (title) => {
+    const lowered = (title || '').toLowerCase();
+    return heavyLegKeywords.some(keyword => lowered.includes(keyword));
   };
 
   for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
@@ -280,25 +291,26 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // 🆕 Updated for all heavy weighted leg movements (not just machines)
+    // 🆕 For Leg Days: force heavy movements only
     if (isLegDay) {
-      const prioritizeHeavy = candidates.filter(t => prioritizeHeavyLegs(t.title));
-      if (prioritizeHeavy.length > 0) {
-        candidates = prioritizeHeavy;
-        console.log(`✅ Prioritizing heavy weighted leg exercises for Legs day.`);
+      const heavyCandidates = candidates.filter(t => isHeavyLegExercise(t.title));
+      if (heavyCandidates.length > 0) {
+        candidates = heavyCandidates;
+        console.log(`✅ Prioritizing heavy leg exercise for muscle group: ${muscle}`);
       }
     }
 
     if (candidates.length === 0) {
-      console.log(`⚠️ No suitable template found for ${muscle}. Falling back to any muscle group.`);
+      console.log(`⚠️ No heavy candidate found for ${muscle}. Falling back to any heavy movement for legs.`);
       candidates = templates.filter(t => {
-        const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
+        const matchesPrimary = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
+        const heavyEnough = isLegDay ? isHeavyLegExercise(t.title) : true;
         let isRecent = recentTitles.has(t.title);
         if (workouts && workouts.length > 0) {
           const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
           isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
         }
-        return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
+        return matchesPrimary && heavyEnough && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
       });
     }
 
@@ -330,60 +342,9 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     }
   }
 
-  // If still missing exercises, random fill
-  while (selectedExercises.length < numExercises) {
-    const muscle = sortedMuscleGroups[Math.floor(Math.random() * sortedMuscleGroups.length)];
-    let candidates = templates.filter(t => {
-      const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
-      let isRecent = recentTitles.has(t.title);
-      if (workouts && workouts.length > 0) {
-        const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-        isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
-      }
-      return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
-    });
-
-    if (candidates.length === 0) {
-      console.log(`⚠️ No more suitable templates found for ${muscle}. Falling back to any muscle group.`);
-      candidates = templates.filter(t => {
-        const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
-        let isRecent = recentTitles.has(t.title);
-        if (workouts && workouts.length > 0) {
-          const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-          isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
-        }
-        return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
-      });
-    }
-
-    if (candidates.length === 0) {
-      console.log(`⚠️ No more templates found for ${muscle}. Stopping at ${selectedExercises.length} exercises.`);
-      break;
-    }
-
-    const nonBicep = candidates.filter(t => !(t.primary_muscle_group || '').toLowerCase().includes('biceps'));
-    const finalCandidates = nonBicep.length > 0 && muscle !== 'Biceps' ? nonBicep : candidates;
-
-    const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
-    finalCandidates.sort((a, b) => {
-      const aIsNewEquipment = usedEquipment.has(a.equipment) ? 1 : 0;
-      const bIsNewEquipment = usedEquipment.has(b.equipment) ? 1 : 0;
-      return aIsNewEquipment - bIsNewEquipment;
-    });
-
-    const selected = finalCandidates[0];
-    const progression = progressionAnalysis[selected.title];
-    const note = progression
-      ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
-      : "Start moderate and build";
-
-    console.log(`✅ Selected (additional): ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
-    selectedExercises.push({ ...selected, note });
-    usedTitles.add(selected.title);
-  }
-
   return selectedExercises;
 }
+
 
 
 function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
