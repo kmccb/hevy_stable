@@ -235,19 +235,16 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const usedTitles = new Set();
   const selectedExercises = [];
 
-  // Prioritize lats for pull days
+  // Prioritize lats first for pull days
   const sortedMuscleGroups = ['Lats', ...muscleGroups.filter(m => m !== 'Lats')];
 
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // 🆕 Define serious heavy leg exercises
+  // 🆕 Expanded heavy legs keywords
   const heavyLegKeywords = [
-    "leg press", "hack squat", "split squat", "goblet squat", "front squat", "box squat",
-    "bulgarian split squat", "walking lunge", "step up", "pendulum squat", "sumo squat",
-    "zercher squat", "overhead dumbbell lunge", "leg extension", "leg curl",
-    "seated leg curl", "lying leg curl", "hip thrust", "glute bridge (weighted)", 
-    "romanian deadlift", "rdl", "calf raise", "single leg press", "single leg extension"
+    "press", "squat", "lunge", "extension", "curl",
+    "deadlift", "hip thrust", "glute bridge", "step up", "calf raise"
   ];
 
   const isLegDay = muscleGroups.some(m => ['quads', 'hamstrings', 'glutes', 'calves'].includes(m.toLowerCase()));
@@ -270,29 +267,19 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // 🆕 Strict Filtering for Leg Day
+    // 🆕 Ultra-Smart Leg Day matching
     if (isLegDay && ['quads', 'glutes', 'hamstrings', 'calves'].includes(muscle.toLowerCase())) {
       const heavyCandidates = candidates.filter(t => isHeavyLegExercise(t.title));
       if (heavyCandidates.length > 0) {
         candidates = heavyCandidates;
-        console.log(`✅ Prioritizing heavy leg exercise for: ${muscle}`);
+        console.log(`✅ Prioritizing heavy lower body exercise for: ${muscle}`);
       } else {
-        console.log(`⚠️ No heavy leg candidate for ${muscle}, falling back.`);
+        console.log(`⚠️ No heavy leg candidate for ${muscle}, falling back to any heavy leg movement.`);
+        // Try again across all templates for any heavy leg move
+        candidates = templates.filter(t => {
+          return isHeavyLegExercise(t.title) && !usedTitles.has(t.title) && varietyFilter(t);
+        });
       }
-    }
-
-    if (candidates.length === 0) {
-      console.log(`⚠️ No suitable candidate found for ${muscle}. Falling back to any muscle group.`);
-      candidates = templates.filter(t => {
-        const primaryMatch = muscleGroups.some(m => (t.primary_muscle_group || '').toLowerCase().includes(m.toLowerCase()));
-        const heavyEnough = !isLegDay || isHeavyLegExercise(t.title); // If Leg Day, only heavy allowed
-        let isRecent = recentTitles.has(t.title);
-        if (workouts && workouts.length > 0) {
-          const lastUsed = workouts.find(w => w.exercises.some(e => e.title === t.title))?.start_time;
-          isRecent = lastUsed && new Date(lastUsed) > sevenDaysAgo;
-        }
-        return primaryMatch && heavyEnough && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
-      });
     }
 
     if (candidates.length > 0) {
@@ -316,12 +303,13 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ Still no candidate for ${muscle} after fallback. Skipping.`);
+      console.log(`⚠️ No candidate found for ${muscle} even after fallback.`);
     }
   }
 
   return selectedExercises;
 }
+
 
 
 
