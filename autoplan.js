@@ -235,23 +235,26 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const usedTitles = new Set();
   const selectedExercises = [];
 
-  // Prioritize lats first for pull days
   const sortedMuscleGroups = ['Lats', ...muscleGroups.filter(m => m !== 'Lats')];
-
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // 🆕 Expanded heavy legs keywords
-  const heavyLegKeywords = [
-    "press", "squat", "lunge", "extension", "curl",
-    "deadlift", "hip thrust", "glute bridge", "step up", "calf raise"
+  const isLegDay = muscleGroups.some(m =>
+    ['quads', 'glutes', 'hamstrings', 'calves'].includes(m.toLowerCase())
+  );
+
+  const legMuscleGroups = ['quads', 'glutes', 'hamstrings', 'calves'];
+  const legKeywords = [
+    'press', 'squat', 'lunge', 'extension', 'curl',
+    'deadlift', 'rdl', 'step up', 'hip thrust', 'glute bridge', 'calf'
   ];
 
-  const isLegDay = muscleGroups.some(m => ['quads', 'hamstrings', 'glutes', 'calves'].includes(m.toLowerCase()));
-
-  const isHeavyLegExercise = (title) => {
-    const lowered = (title || '').toLowerCase();
-    return heavyLegKeywords.some(keyword => lowered.includes(keyword));
+  const isRealLegExercise = (template) => {
+    const title = (template.title || '').toLowerCase();
+    const muscle = (template.primary_muscle_group || '').toLowerCase();
+    const hitsKeyword = legKeywords.some(k => title.includes(k));
+    const hitsMuscle = legMuscleGroups.some(m => muscle.includes(m));
+    return hitsKeyword && hitsMuscle;
   };
 
   for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
@@ -267,18 +270,14 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // 🆕 Ultra-Smart Leg Day matching
-    if (isLegDay && ['quads', 'glutes', 'hamstrings', 'calves'].includes(muscle.toLowerCase())) {
-      const heavyCandidates = candidates.filter(t => isHeavyLegExercise(t.title));
-      if (heavyCandidates.length > 0) {
-        candidates = heavyCandidates;
-        console.log(`✅ Prioritizing heavy lower body exercise for: ${muscle}`);
-      } else {
-        console.log(`⚠️ No heavy leg candidate for ${muscle}, falling back to any heavy leg movement.`);
-        // Try again across all templates for any heavy leg move
-        candidates = templates.filter(t => {
-          return isHeavyLegExercise(t.title) && !usedTitles.has(t.title) && varietyFilter(t);
-        });
+    // 🛡 Strict validation for Leg Day
+    if (isLegDay && legMuscleGroups.includes(muscle.toLowerCase())) {
+      candidates = candidates.filter(isRealLegExercise);
+      if (candidates.length === 0) {
+        console.log(`❌ No heavy match for ${muscle} — searching all real leg exercises.`);
+        candidates = templates.filter(t =>
+          isRealLegExercise(t) && !usedTitles.has(t.title) && varietyFilter(t)
+        );
       }
     }
 
@@ -303,12 +302,13 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ No candidate found for ${muscle} even after fallback.`);
+      console.log(`⚠️ No usable template for ${muscle}, even after all fallback attempts.`);
     }
   }
 
   return selectedExercises;
 }
+
 
 
 
