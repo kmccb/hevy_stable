@@ -253,6 +253,23 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
+     // 🆕 Extra Filter for Leg Days (Real Machine Lifts First)
+     if (muscleGroups.includes('Quads') || muscleGroups.includes('Hamstrings') || muscleGroups.includes('Glutes') || muscleGroups.includes('Calves')) {
+      const prioritizeMachine = candidates.filter(t => {
+        const title = t.title.toLowerCase();
+        return title.includes('leg press') ||
+               title.includes('leg extension') ||
+               title.includes('leg curl') ||
+               title.includes('seated leg curl') ||
+               title.includes('lying leg curl') ||
+               title.includes('calf raise');
+      });
+      if (prioritizeMachine.length > 0) {
+        candidates = prioritizeMachine;
+        console.log(`✅ Prioritizing machine-based leg exercises for Legs day.`);
+      }
+    }
+
     if (candidates.length === 0) {
       console.log(`⚠️ No suitable template found for ${muscle}. Falling back to any Pull muscle.`);
       candidates = templates.filter(t => {
