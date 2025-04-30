@@ -239,6 +239,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+  // 💪 Leg Day detection and strict filtering
   const isLegDay = muscleGroups.some(m =>
     ['quads', 'glutes', 'hamstrings', 'calves'].includes(m.toLowerCase())
   );
@@ -252,12 +253,33 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const isRealLegExercise = (template) => {
     const title = (template.title || '').toLowerCase();
     const muscle = (template.primary_muscle_group || '').toLowerCase();
-    const hitsKeyword = legKeywords.some(k => title.includes(k));
-    const hitsMuscle = legMuscleGroups.some(m => muscle.includes(m));
-    return hitsKeyword && hitsMuscle;
+    return legKeywords.some(k => title.includes(k)) &&
+           legMuscleGroups.some(m => muscle.includes(m));
   };
 
-  for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < numExercises; i++) {
+  // 🧠 Core Day detection and filtering
+  const isCoreDay = muscleGroups.every(m =>
+    ['abdominals', 'obliques', 'core'].includes(m.toLowerCase())
+  );
+
+  const coreKeywords = [
+    'crunch', 'plank', 'sit up', 'knee raise', 'leg raise', 'dead bug',
+    'ab wheel', 'jackknife', 'russian twist', 'scissors', 'cable crunch',
+    'v-up', 'dragon flag', 'woodchopper', 'side bend', 'twist', 'hollow hold'
+  ];
+
+  const isGoodCoreExercise = (t) => {
+    const title = (t.title || '').toLowerCase();
+    const muscle = (t.primary_muscle_group || '').toLowerCase();
+    return (
+      ['abdominals', 'obliques', 'core'].some(m => muscle.includes(m)) &&
+      coreKeywords.some(k => title.includes(k))
+    );
+  };
+
+  const desiredNumExercises = isCoreDay ? 8 : numExercises;
+
+  for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < desiredNumExercises; i++) {
     const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
 
     let candidates = templates.filter(t => {
@@ -270,7 +292,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // 🛡 Strict validation for Leg Day
+    // 🔐 Leg Day strict filtering
     if (isLegDay && legMuscleGroups.includes(muscle.toLowerCase())) {
       candidates = candidates.filter(isRealLegExercise);
       if (candidates.length === 0) {
@@ -281,15 +303,25 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       }
     }
 
+    // 🧠 Core Day smart filtering
+    if (isCoreDay) {
+      candidates = candidates.filter(isGoodCoreExercise);
+      if (candidates.length === 0) {
+        candidates = templates.filter(t =>
+          isGoodCoreExercise(t) && !usedTitles.has(t.title) && varietyFilter(t)
+        );
+      }
+    }
+
     if (candidates.length > 0) {
       const nonBicep = candidates.filter(t => !(t.primary_muscle_group || '').toLowerCase().includes('biceps'));
       const finalCandidates = nonBicep.length > 0 && muscle !== 'Biceps' ? nonBicep : candidates;
 
       const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
       finalCandidates.sort((a, b) => {
-        const aIsNewEquipment = usedEquipment.has(a.equipment) ? 1 : 0;
-        const bIsNewEquipment = usedEquipment.has(b.equipment) ? 1 : 0;
-        return aIsNewEquipment - bIsNewEquipment;
+        const aNew = usedEquipment.has(a.equipment) ? 1 : 0;
+        const bNew = usedEquipment.has(b.equipment) ? 1 : 0;
+        return aNew - bNew;
       });
 
       const selected = finalCandidates[0];
@@ -304,6 +336,27 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     } else {
       console.log(`⚠️ No usable template for ${muscle}, even after all fallback attempts.`);
     }
+  }
+
+  // ⛽️ Core Day: top off to ensure 8 total exercises
+  while (selectedExercises.length < desiredNumExercises) {
+    const fill = templates.filter(t =>
+      !usedTitles.has(t.title) &&
+      varietyFilter(t) &&
+      (!isCoreDay || isGoodCoreExercise(t))
+    );
+
+    if (fill.length === 0) break;
+
+    const selected = fill[0];
+    const progression = progressionAnalysis[selected.title];
+    const note = progression
+      ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
+      : "Finish strong";
+
+    console.log(`➕ Added filler: ${selected.title}`);
+    selectedExercises.push({ ...selected, note });
+    usedTitles.add(selected.title);
   }
 
   return selectedExercises;
