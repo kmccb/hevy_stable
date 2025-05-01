@@ -179,47 +179,58 @@ function determineWorkoutTypeByLastHit(workouts = []) {
     Pull: ['lats', 'upper back', 'biceps', 'rear delts'],
     Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'full body'],
     Core: ['abdominals', 'obliques', 'core', 'lower back'],
-  };
-
-  const lastHit = {
-    Push: null,
-    Pull: null,
-    Legs: null,
-    Core: null,
-  };
-
-  for (const workout of workouts) {
-    const workoutDate = new Date(workout.start_time);
-    const seenSplits = new Set();
-
-    for (const exercise of workout.exercises) {
-      const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
-      if (!template) continue;
-
-      const muscle = (template.primary_muscle_group || '').toLowerCase();
-      for (const [split, groups] of Object.entries(splitMap)) {
-        if (groups.some(g => muscle.includes(g)) && !seenSplits.has(split)) {
-          if (!lastHit[split] || workoutDate > lastHit[split]) {
-            lastHit[split] = workoutDate;
-            seenSplits.add(split);
+  };function determineWorkoutTypeByLastHit(workouts = []) {
+    const splitMap = {
+      Push: ['chest', 'shoulders', 'triceps'],
+      Pull: ['lats', 'upper back', 'biceps', 'rear delts'],
+      Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'full body'],
+      Core: ['abdominals', 'obliques', 'core', 'lower back']
+    };
+  
+    const lastHit = {
+      Push: null,
+      Pull: null,
+      Legs: null,
+      Core: null
+    };
+  
+    for (const workout of workouts) {
+      const workoutDate = new Date(workout.start_time);
+  
+      const splitsTouched = new Set();
+  
+      for (const exercise of workout.exercises) {
+        const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
+        if (!template) continue;
+  
+        const muscle = (template.primary_muscle_group || '').toLowerCase();
+        for (const [split, muscles] of Object.entries(splitMap)) {
+          if (muscles.some(m => muscle.includes(m))) {
+            splitsTouched.add(split);
           }
         }
       }
+  
+      for (const split of splitsTouched) {
+        if (!lastHit[split] || workoutDate > lastHit[split]) {
+          lastHit[split] = workoutDate;
+        }
+      }
     }
+  
+    const now = new Date();
+    const splitAges = Object.entries(lastHit).map(([split, date]) => {
+      const daysAgo = date ? Math.floor((now - date) / (1000 * 60 * 60 * 24)) : 99;
+      return { split, daysAgo };
+    });
+  
+    splitAges.sort((a, b) => b.daysAgo - a.daysAgo); // most overdue first
+  
+    const chosen = splitAges[0];
+    console.log(`📅 Smart Split: ${chosen.split} (last hit ${chosen.daysAgo} days ago)`);
+    return chosen.split;
   }
-
-  const now = new Date();
-  const splitAges = Object.entries(lastHit).map(([split, date]) => {
-    const daysAgo = date ? Math.floor((now - date) / (1000 * 60 * 60 * 24)) : 99;
-    return { split, daysAgo };
-  });
-
-  splitAges.sort((a, b) => b.daysAgo - a.daysAgo); // pick the most overdue
-
-  const chosen = splitAges[0];
-  console.log(`📅 Smart Split: ${chosen.split} (last hit ${chosen.daysAgo} days ago)`);
-  return chosen.split;
-}
+  
 
 
 function pickExercises(workouts, templates, muscleGroups, recentTitles, progressionAnalysis, varietyFilter, numExercises = 6) {
