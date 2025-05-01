@@ -89,19 +89,43 @@ let exerciseTemplates = [];
 let historyAnalysis = null;
 
 function analyzeHistory(workouts) {
+  // Ensure we only analyze the last 30 workouts
+  const recentWorkouts = workouts.slice(0, 30);
   const recentTitles = new Set();
   const muscleGroupFrequency = {};
   const exerciseFrequency = {};
   const absMetrics = { totalSessions: 0, exercises: new Set(), totalSets: 0 };
   const progressionData = {};
+  // Track weekly split frequency (Push, Pull, Legs, Core)
+  const weeklySplitFrequency = { Push: 0, Pull: 0, Legs: 0, Core: 0 };
 
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-  for (const workout of workouts) {
+  for (const workout of recentWorkouts) {
     let hasAbs = false;
     const workoutDate = new Date(workout.start_time);
     const isRecent = workoutDate >= oneDayAgo;
+    const isThisWeek = workoutDate >= oneWeekAgo;
+
+    // Determine the split type of the workout
+    let workoutSplit = null;
+    for (const exercise of workout.exercises) {
+      const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
+      if (template) {
+        const primaryMuscle = template.primary_muscle_group.toLowerCase();
+        if (['chest', 'shoulders', 'triceps'].some(m => primaryMuscle.includes(m))) workoutSplit = 'Push';
+        else if (['lats', 'upper_back', 'biceps', 'rear_delts'].some(m => primaryMuscle.includes(m))) workoutSplit = 'Pull';
+        else if (['quads', 'hamstrings', 'glutes', 'calves', 'full_body'].some(m => primaryMuscle.includes(m))) workoutSplit = 'Legs';
+        else if (['abdominals', 'obliques', 'core', 'lower_back'].some(m => primaryMuscle.includes(m))) workoutSplit = 'Core';
+      }
+    }
+
+    if (isThisWeek && workoutSplit) {
+      weeklySplitFrequency[workoutSplit]++;
+    }
 
     for (const exercise of workout.exercises) {
       if (isRecent) {
@@ -169,16 +193,17 @@ function analyzeHistory(workouts) {
     muscleGroupFrequency,
     exerciseFrequency,
     absMetrics,
-    progressionAnalysis
+    progressionAnalysis,
+    weeklySplitFrequency
   };
 }
 
 function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
   const splitMap = {
     Push: ['chest', 'shoulders', 'triceps'],
-    Pull: ['lats', 'upper back', 'biceps', 'rear delts'],
-    Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'full body'],
-    Core: ['abdominals', 'obliques', 'core', 'lower back']
+    Pull: ['lats', 'upper_back', 'biceps', 'rear_delts'],
+    Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'full_body'],
+    Core: ['abdominals', 'obliques', 'core', 'lower_back']
   };
 
   const lastHit = {
@@ -217,15 +242,35 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
     return { split, daysAgo };
   });
 
-  splitAges.sort((a, b) => b.daysAgo - a.daysAgo); // most overdue first
+  // Get weekly split frequency from history analysis
+  const { weeklySplitFrequency } = historyAnalysis;
 
+  // Prioritize splits that haven't been hit this week
+  const splitsNotHitThisWeek = Object.keys(weeklySplitFrequency).filter(split => weeklySplitFrequency[split] === 0);
+  if (splitsNotHitThisWeek.length > 0) {
+    const chosenSplit = splitsNotHitThisWeek[0]; // Pick the first one (e.g., Pull in your case)
+    console.log(`📅 Smart Split: ${chosenSplit} (not hit this week)`);
+    return chosenSplit;
+  }
+
+  // If all splits have been hit this week, prioritize the least frequent split in the last 30 workouts
+  const splitFrequencies = Object.entries(weeklySplitFrequency).map(([split, freq]) => ({ split, freq }));
+  splitFrequencies.sort((a, b) => a.freq - b.freq); // Least frequent first
+  const leastFrequentSplit = splitFrequencies[0].split;
+  
+  // Ensure we don't repeat a split within 3 days unless necessary
+  const recentSplits = splitAges.filter(s => s.daysAgo < 3).map(s => s.split);
+  if (!recentSplits.includes(leastFrequentSplit)) {
+    console.log(`📅 Smart Split: ${leastFrequentSplit} (least frequent this week, not hit in last 3 days)`);
+    return leastFrequentSplit;
+  }
+
+  // If all options are recent, pick the most overdue
+  splitAges.sort((a, b) => b.daysAgo - a.daysAgo); // Most overdue first
   const chosen = splitAges[0];
   console.log(`📅 Smart Split: ${chosen.split} (last hit ${chosen.daysAgo} days ago)`);
   return chosen.split;
 }
-
-
-
 
 function pickExercises(workouts, templates, muscleGroups, recentTitles, progressionAnalysis, varietyFilter, numExercises = 6) {
   const usedTitles = new Set();
@@ -235,7 +280,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  // 💪 Leg Day detection and strict filtering
   const isLegDay = muscleGroups.some(m =>
     ['quads', 'glutes', 'hamstrings', 'calves'].includes(m.toLowerCase())
   );
@@ -253,7 +297,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
            legMuscleGroups.some(m => muscle.includes(m));
   };
 
-  // 🧠 Core Day detection and filtering
   const isCoreDay = muscleGroups.every(m =>
     ['abdominals', 'obliques', 'core'].includes(m.toLowerCase())
   );
@@ -288,7 +331,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t) && !isRecent;
     });
 
-    // 🔐 Leg Day strict filtering
     if (isLegDay && legMuscleGroups.includes(muscle.toLowerCase())) {
       candidates = candidates.filter(isRealLegExercise);
       if (candidates.length === 0) {
@@ -299,7 +341,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       }
     }
 
-    // 🧠 Core Day smart filtering
     if (isCoreDay) {
       candidates = candidates.filter(isGoodCoreExercise);
       if (candidates.length === 0) {
@@ -334,7 +375,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
     }
   }
 
-  // ⛽️ Core Day: top off to ensure 8 total exercises
   while (selectedExercises.length < desiredNumExercises) {
     const fill = templates.filter(t =>
       !usedTitles.has(t.title) &&
@@ -358,20 +398,15 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   return selectedExercises;
 }
 
-
-
-
-
-
 function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
   const absMuscles = ['abdominals', 'obliques'];
   const selectedExercises = [];
   const usedTitles = new Set();
 
   const priorityExercises = [
-    { muscle: 'abdominals', note: "Focus on slow reps", mustHave: ['crunch', 'raise', 'sit up', 'leg raise'] },
-    { muscle: 'obliques', note: "Controlled twists", mustHave: ['twist', 'side plank', 'woodchopper', 'russian', 'side bend'] },
-    { muscle: 'abdominals', note: "Isometric hold", mustHave: ['plank', 'hold', 'dead bug', 'hollow', 'l-sit'] }
+    { muscle: 'abdominals', note: "Focus on slow reps", mustHave: ['crunch', 'raise', 'sit up', 'leg raise', 'v-up', 'jackknife'] },
+    { muscle: 'obliques', note: "Controlled twists", mustHave: ['twist', 'side plank', 'woodchopper', 'russian', 'side bend', 'scissors'] },
+    { muscle: 'abdominals', note: "Isometric hold", mustHave: ['plank', 'hold', 'dead bug', 'hollow', 'l-sit', 'dragon flag'] }
   ];
 
   const fiveDaysAgo = new Date();
@@ -448,7 +483,9 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
       }
     }
     if (equipment === 'resistance_band') return 10;
-    if (equipment === 'dumbbell') return 5;
+    if (equipment === 'dumbbell') return 10;
+    if (equipment === 'barbell') return 20;
+    if (equipment === 'machine') return 15;
     return 0;
   };
 
@@ -699,12 +736,10 @@ async function refreshRoutines() {
 async function autoplan({ workouts, templates, routines }) {
   try {
     exerciseTemplates = templates.filter(t => !excludedExercises.has(t.title));
-    historyAnalysis = analyzeHistory(workouts || []);
+    historyAnalysis = analyzeHistory(workouts || []); // Now processes last 30 workouts and tracks weekly splits
     const varietyFilter = filterForVariety(workouts || []);
     const lastCompletedWorkout = workouts && workouts.length > 0 ? workouts[0] : null;
-    const workoutType = determineWorkoutTypeByLastHit(workouts, exerciseTemplates);
-
-
+    const workoutType = determineWorkoutTypeByLastHit(workouts, exerciseTemplates); // Now prioritizes Pull
 
     const muscleGroups = muscleTargets[workoutType];
     console.log("🧠 Split selected:", workoutType);
