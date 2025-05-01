@@ -108,26 +108,34 @@ function analyzeHistory(workouts) {
     const isRecent = workoutDate >= oneDayAgo;
     const isThisWeek = workoutDate >= oneWeekAgo;
 
-    // Track all splits touched by this workout
-    const splitsTouched = new Set();
+    const splitCounts = { Push: 0, Pull: 0, Legs: 0, Core: 0 };
     for (const exercise of workout.exercises) {
       const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
       if (template) {
         const primaryMuscle = template.primary_muscle_group.toLowerCase();
+        const splitsTouched = new Set();
         if (['chest', 'shoulders', 'triceps'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Push');
         if (['lats', 'upper_back', 'biceps', 'rear_delts'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Pull');
         if (['quads', 'hamstrings', 'glutes', 'calves', 'full_body'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Legs');
         if (['abdominals', 'obliques', 'core', 'lower_back'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Core');
 
+        splitsTouched.forEach(split => {
+          splitCounts[split]++;
+        });
+
         console.log(`🔎 Workout (${workout.start_time}): Exercise "${exercise.title}" (Muscle: ${primaryMuscle}) → Splits: ${[...splitsTouched].join(', ')}`);
       }
     }
 
-    if (isThisWeek) {
-      splitsTouched.forEach(split => {
-        weeklySplitFrequency[split]++;
-      });
-      console.log(`📊 Weekly Split Update (${workout.start_time}): ${JSON.stringify(weeklySplitFrequency)}`);
+    const primarySplit = Object.entries(splitCounts)
+      .sort(([, a], [, b]) => b - a)
+      .find(([split, count]) => count > 0)?.[0];
+
+    if (isThisWeek && primarySplit) {
+      weeklySplitFrequency[primarySplit]++;
+      console.log(`📊 Weekly Split Update (${workout.start_time}): Primary Split: ${primarySplit}, Frequency: ${JSON.stringify(weeklySplitFrequency)}`);
+    } else if (isThisWeek) {
+      console.log(`📊 Weekly Split Update (${workout.start_time}): No primary split identified (possibly cardio-only). Frequency: ${JSON.stringify(weeklySplitFrequency)}`);
     }
 
     for (const exercise of workout.exercises) {
@@ -219,7 +227,7 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
 
   for (const workout of workouts) {
     const workoutDate = new Date(workout.start_time);
-    const splitsTouched = new Set();
+    const splitCounts = { Push: 0, Pull: 0, Legs: 0, Core: 0 };
 
     for (const exercise of workout.exercises) {
       const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
@@ -228,15 +236,17 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
       const muscle = (template.primary_muscle_group || '').toLowerCase();
       for (const [split, muscles] of Object.entries(splitMap)) {
         if (muscles.some(m => muscle.includes(m))) {
-          splitsTouched.add(split);
+          splitCounts[split]++;
         }
       }
     }
 
-    for (const split of splitsTouched) {
-      if (!lastHit[split] || workoutDate > lastHit[split]) {
-        lastHit[split] = workoutDate;
-      }
+    const primarySplit = Object.entries(splitCounts)
+      .sort(([, a], [, b]) => b - a)
+      .find(([split, count]) => count > 0)?.[0];
+
+    if (primarySplit && (!lastHit[primarySplit] || workoutDate > lastHit[primarySplit])) {
+      lastHit[primarySplit] = workoutDate;
     }
   }
 
@@ -258,16 +268,18 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
     return chosenSplit;
   }
 
-  const splitFrequencies = Object.entries(weeklySplitFrequency).map(([split, freq]) => ({ split, freq }));
-  splitFrequencies.sort((a, b) => a.freq - b.freq);
-  const leastFrequentSplit = splitFrequencies[0].split;
-  console.log(`📅 Least Frequent Split: ${leastFrequentSplit} (Frequency: ${splitFrequencies[0].freq})`);
+  const splitFrequencies = Object.entries(weeklySplitFrequency).map(([split, freq]) => {
+    const daysAgo = splitAges.find(s => s.split === split)?.daysAgo || 99;
+    return { split, freq, daysAgo };
+  });
+  splitFrequencies.sort((a, b) => a.freq - b.freq || a.daysAgo - b.daysAgo);
+  console.log(`📅 Sorted Splits by Frequency: ${JSON.stringify(splitFrequencies)}`);
 
-  const recentSplits = splitAges.filter(s => s.daysAgo < 3).map(s => s.split);
-  console.log(`📅 Recent Splits (within 3 days): ${recentSplits.join(', ') || 'None'}`);
-  if (!recentSplits.includes(leastFrequentSplit)) {
-    console.log(`📅 Smart Split: ${leastFrequentSplit} (least frequent this week, not hit in last 3 days)`);
-    return leastFrequentSplit;
+  for (const { split, daysAgo } of splitFrequencies) {
+    if (daysAgo >= 2) {
+      console.log(`📅 Smart Split: ${split} (least frequent with freq ${weeklySplitFrequency[split]}, last hit ${daysAgo} days ago)`);
+      return split;
+    }
   }
 
   splitAges.sort((a, b) => b.daysAgo - a.daysAgo);
