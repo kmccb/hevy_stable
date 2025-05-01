@@ -173,63 +173,54 @@ function analyzeHistory(workouts) {
   };
 }
 
-function determineWorkoutType(historyAnalysis, lastCompletedWorkout, allWorkouts = []) {
-  const lastScheduled = readLastScheduled();
-  const today = new Date();
-  const lastScheduledDate = lastScheduled.date ? new Date(lastScheduled.date) : null;
+function determineWorkoutTypeByLastHit(workouts = []) {
+  const splitMap = {
+    Push: ['chest', 'shoulders', 'triceps'],
+    Pull: ['lats', 'upper back', 'biceps', 'rear delts'],
+    Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'full body'],
+    Core: ['abdominals', 'obliques', 'core', 'lower back'],
+  };
 
-  if (lastScheduled.workoutType && lastScheduledDate) {
-    const lastScheduledDateStr = lastScheduledDate.toISOString().split('T')[0];
-    const lastCompletedDate = lastCompletedWorkout?.start_time ? new Date(lastCompletedWorkout.start_time).toISOString().split('T')[0] : null;
+  const lastHit = {
+    Push: null,
+    Pull: null,
+    Legs: null,
+    Core: null,
+  };
 
-    if (!lastCompletedDate || lastScheduledDateStr > lastCompletedDate) {
-      console.log(`🔄 Last scheduled workout (${lastScheduled.workoutType}) on ${lastScheduledDateStr} was not completed. Scheduling it again.`);
-      return lastScheduled.workoutType;
-    }
-  }
+  for (const workout of workouts) {
+    const workoutDate = new Date(workout.start_time);
+    const seenSplits = new Set();
 
-  const recentSplits = [];
-  for (const workout of allWorkouts.slice(0, 3)) {
-    const splitsSeen = new Set();
     for (const exercise of workout.exercises) {
       const template = exerciseTemplates.find(t => t.id === exercise.exercise_template_id);
       if (!template) continue;
-      const muscle = template.primary_muscle_group?.toLowerCase();
-      const split = muscleToWorkoutType[muscle];
-      if (split && !splitsSeen.has(split)) {
-        recentSplits.push(split);
-        splitsSeen.add(split);
+
+      const muscle = (template.primary_muscle_group || '').toLowerCase();
+      for (const [split, groups] of Object.entries(splitMap)) {
+        if (groups.some(g => muscle.includes(g)) && !seenSplits.has(split)) {
+          if (!lastHit[split] || workoutDate > lastHit[split]) {
+            lastHit[split] = workoutDate;
+            seenSplits.add(split);
+          }
+        }
       }
     }
   }
 
-  const lastSplit = recentSplits[0];
-  const recentSplitCounts = recentSplits.reduce((counts, split) => {
-    counts[split] = (counts[split] || 0) + 1;
-    return counts;
-  }, {});
-
-  const muscleFrequencies = historyAnalysis.muscleGroupFrequency;
-  const splitScores = Object.entries(muscleTargets).map(([split, muscles]) => {
-    const totalFreq = muscles.reduce((sum, m) => sum + (muscleFrequencies[m.toLowerCase()] || 0), 0);
-    return { split, frequency: totalFreq, recentCount: recentSplitCounts[split] || 0 };
+  const now = new Date();
+  const splitAges = Object.entries(lastHit).map(([split, date]) => {
+    const daysAgo = date ? Math.floor((now - date) / (1000 * 60 * 60 * 24)) : 99;
+    return { split, daysAgo };
   });
 
-  const avoidSplit = lastSplit;
+  splitAges.sort((a, b) => b.daysAgo - a.daysAgo); // pick the most overdue
 
-  const preferred = splitScores
-    .filter(s => s.split !== avoidSplit)
-    .sort((a, b) => a.frequency - b.frequency || a.recentCount - b.recentCount);
-
-  if (preferred.length > 0) {
-    console.log(`📅 Smart-rotated workout: ${preferred[0].split} (avoiding repeat of ${avoidSplit})`);
-    return preferred[0].split;
-  }
-
-  const fallback = splitScores.sort((a, b) => a.frequency - b.frequency)[0]?.split || 'Push';
-  console.log(`📅 All splits recent. Fallback to: ${fallback}`);
-  return fallback;
+  const chosen = splitAges[0];
+  console.log(`📅 Smart Split: ${chosen.split} (last hit ${chosen.daysAgo} days ago)`);
+  return chosen.split;
 }
+
 
 function pickExercises(workouts, templates, muscleGroups, recentTitles, progressionAnalysis, varietyFilter, numExercises = 6) {
   const usedTitles = new Set();
@@ -706,7 +697,8 @@ async function autoplan({ workouts, templates, routines }) {
     historyAnalysis = analyzeHistory(workouts || []);
     const varietyFilter = filterForVariety(workouts || []);
     const lastCompletedWorkout = workouts && workouts.length > 0 ? workouts[0] : null;
-    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout, workouts);
+    const workoutType = determineWorkoutTypeByLastHit(workouts);
+
 
     const muscleGroups = muscleTargets[workoutType];
     console.log("🧠 Split selected:", workoutType);
