@@ -1,4 +1,4 @@
-const COACH_GPT_VERSION = 'v1.5 – Balanced pull exercises';
+const COACH_GPT_VERSION = 'v1.6 – Enhanced exercise selection and supersets';
 console.log(`🏷️ autoplan.js - CoachGPT Version: ${COACH_GPT_VERSION}`);
 
 const axios = require('axios');
@@ -334,6 +334,7 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
 
   const desiredNumExercises = isCoreDay ? 8 : numExercises;
 
+  // First attempt: Strict filtering with variety and recency
   for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < desiredNumExercises; i++) {
     const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
 
@@ -349,21 +350,6 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
 
     if (isLegDay && legMuscleGroups.includes(muscle.toLowerCase())) {
       candidates = candidates.filter(isRealLegExercise);
-      if (candidates.length === 0) {
-        console.log(`❌ No heavy match for ${muscle} — searching all real leg exercises.`);
-        candidates = templates.filter(t =>
-          isRealLegExercise(t) && !usedTitles.has(t.title) && varietyFilter(t)
-        );
-      }
-    }
-
-    if (isCoreDay) {
-      candidates = candidates.filter(isGoodCoreExercise);
-      if (candidates.length === 0) {
-        candidates = templates.filter(t =>
-          isGoodCoreExercise(t) && !usedTitles.has(t.title) && varietyFilter(t)
-        );
-      }
     }
 
     if (candidates.length > 0) {
@@ -387,31 +373,97 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ No usable template for ${muscle}, even after all fallback attempts.`);
+      console.log(`⚠️ No usable template for ${muscle} with strict filters.`);
     }
   }
 
-  while (selectedExercises.length < desiredNumExercises) {
-    const fill = templates.filter(t =>
-      !usedTitles.has(t.title) &&
-      varietyFilter(t) &&
-      (!isCoreDay || isGoodCoreExercise(t))
-    );
+  // Second attempt: Relax recency filter if needed
+  if (selectedExercises.length < desiredNumExercises) {
+    console.log(`⚠️ Only ${selectedExercises.length}/${desiredNumExercises} exercises selected. Relaxing recency filter...`);
+    for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < desiredNumExercises; i++) {
+      const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
 
-    if (fill.length === 0) break;
+      let candidates = templates.filter(t => {
+        const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
+        return primaryMatch && !usedTitles.has(t.title) && varietyFilter(t);
+      });
 
-    const selected = fill[0];
-    const progression = progressionAnalysis[selected.title];
-    const note = progression
-      ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
-      : "Finish strong";
+      if (isLegDay && legMuscleGroups.includes(muscle.toLowerCase())) {
+        candidates = candidates.filter(isRealLegExercise);
+      }
 
-    console.log(`➕ Added filler: ${selected.title}`);
-    selectedExercises.push({ ...selected, note });
-    usedTitles.add(selected.title);
+      if (candidates.length > 0) {
+        const nonBicep = candidates.filter(t => !(t.primary_muscle_group || '').toLowerCase().includes('biceps'));
+        const finalCandidates = nonBicep.length > 0 && muscle !== 'Biceps' ? nonBicep : candidates;
+
+        const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
+        finalCandidates.sort((a, b) => {
+          const aNew = usedEquipment.has(a.equipment) ? 1 : 0;
+          const bNew = usedEquipment.has(b.equipment) ? 1 : 0;
+          return aNew - bNew;
+        });
+
+        const selected = finalCandidates[0];
+        const progression = progressionAnalysis[selected.title];
+        const note = progression
+          ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
+          : "Start moderate and build";
+
+        console.log(`✅ Selected (relaxed): ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
+        selectedExercises.push({ ...selected, note });
+        usedTitles.add(selected.title);
+      } else {
+        console.log(`⚠️ No usable template for ${muscle}, even after relaxing recency.`);
+      }
+    }
   }
 
-  return selectedExercises;
+  // Third attempt: Relax variety filter if still not enough
+  if (selectedExercises.length < desiredNumExercises) {
+    console.log(`⚠️ Only ${selectedExercises.length}/${desiredNumExercises} exercises selected. Relaxing variety filter...`);
+    for (let i = 0; i < sortedMuscleGroups.length && selectedExercises.length < desiredNumExercises; i++) {
+      const muscle = sortedMuscleGroups[i % sortedMuscleGroups.length];
+
+      let candidates = templates.filter(t => {
+        const primaryMatch = (t.primary_muscle_group || '').toLowerCase().includes(muscle.toLowerCase());
+        return primaryMatch && !usedTitles.has(t.title);
+      });
+
+      if (isLegDay && legMuscleGroups.includes(muscle.toLowerCase())) {
+        candidates = candidates.filter(isRealLegExercise);
+      }
+
+      if (candidates.length > 0) {
+        const nonBicep = candidates.filter(t => !(t.primary_muscle_group || '').toLowerCase().includes('biceps'));
+        const finalCandidates = nonBicep.length > 0 && muscle !== 'Biceps' ? nonBicep : candidates;
+
+        const usedEquipment = new Set(selectedExercises.map(ex => ex.equipment));
+        finalCandidates.sort((a, b) => {
+          const aNew = usedEquipment.has(a.equipment) ? 1 : 0;
+          const bNew = usedEquipment.has(b.equipment) ? 1 : 0;
+          return aNew - bNew;
+        });
+
+        const selected = finalCandidates[0];
+        const progression = progressionAnalysis[selected.title];
+        const note = progression
+          ? `${progression.suggestion} (last: ${progression.lastWeightLbs} lbs x ${progression.lastReps} reps)`
+          : "Start moderate and build";
+
+        console.log(`✅ Selected (fully relaxed): ${selected.title} (Muscle: ${muscle}, Equipment: ${selected.equipment}, Note: ${note})`);
+        selectedExercises.push({ ...selected, note });
+        usedTitles.add(selected.title);
+      } else {
+        console.log(`⚠️ No usable template for ${muscle}, even after all fallback attempts.`);
+      }
+    }
+  }
+
+  if (selectedExercises.length < desiredNumExercises) {
+    console.warn(`⚠️ Could only select ${selectedExercises.length}/${desiredNumExercises} exercises after all attempts.`);
+  }
+
+  return selectedExercises.slice(0, desiredNumExercises);
 }
 
 function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
@@ -454,17 +506,25 @@ function pickAbsExercises(workouts, templates, recentTitles, numExercises = 3) {
       });
     }
 
+    if (candidates.length === 0) {
+      console.log(`⚠️ No abs template found for ${muscle}. Relaxing recency filter...`);
+      candidates = templates.filter(t => {
+        const primaryMatch = t.primary_muscle_group?.toLowerCase().includes('abdominals') || t.primary_muscle_group?.toLowerCase().includes('obliques');
+        return primaryMatch && !usedTitles.has(t.title);
+      });
+    }
+
     if (candidates.length > 0) {
       const selected = candidates[Math.floor(Math.random() * candidates.length)];
       console.log(`✅ Selected Abs: ${selected.title} (Muscle: ${muscle})`);
       selectedExercises.push({ ...selected, note });
       usedTitles.add(selected.title);
     } else {
-      console.log(`⚠️ No abs template found for ${muscle} even after fallback.`);
+      console.log(`⚠️ No abs template found for ${muscle} even after all fallbacks.`);
     }
   }
 
-  return selectedExercises;
+  return selectedExercises.slice(0, numExercises);
 }
 
 function buildRoutinePayload(workoutType, exercises, absExercises) {
@@ -474,7 +534,7 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
   console.log(`🔍 Valid main exercises: ${validExercises.map(ex => ex.title).join(', ') || 'None'}`);
   console.log(`🔍 Valid abs exercises: ${validAbsExercises.map(ex => ex.title).join(', ') || 'None'}`);
 
-  if (validExercises.length === 0 && validAbsExercises.length === 0) {
+  if (validExercises.length === 0 || validAbsExercises.length === 0) {
     throw new Error('No valid exercises to create routine');
   }
 
@@ -517,18 +577,19 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
 
   const routinePayload = {
     title: `CoachGPT – ${workoutType} + Abs`,
-    notes: "Core focus + stability + abs finishers. Push your pace 💥",
+    notes: "Core focus + stability + abs supersets. Push your pace 💥",
     exercises: []
   };
 
   const allExercises = [];
   const usedExerciseIds = new Set();
 
-  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 3);
+  // Create 6 supersets (12 exercises total)
+  const supersetPairs = Math.min(validExercises.length, validAbsExercises.length, 6);
   for (let i = 0; i < supersetPairs; i++) {
     if (i >= validExercises.length || i >= validAbsExercises.length) break;
     const strength = validExercises[i];
-    const abs = validAbsExercises[i];
+    const abs = validAbsExercises[i % validAbsExercises.length]; // Cycle through abs exercises if fewer than 6
     const supersetId = i;
 
     const strengthWeight = findSimilarExerciseWeight(strength, historyAnalysis.progressionAnalysis);
@@ -561,65 +622,8 @@ function buildRoutinePayload(workoutType, exercises, absExercises) {
     usedExerciseIds.add(abs.id);
   }
 
-  const remainingStrengths = validExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 2);
-  for (const ex of remainingStrengths) {
-    const weight = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
-    const sets = isDurationBased(ex) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
-      Array(3).fill({ type: 'normal', reps: 8, weight_kg: weight });
-
-    allExercises.push({
-      exercise_template_id: ex.id,
-      superset_id: null,
-      rest_seconds: 90,
-      notes: "Finisher – go all in 💪",
-      sets
-    });
-
-    usedExerciseIds.add(ex.id);
-    if (allExercises.length >= 7) break;
-  }
-
-  const remainingAbs = validAbsExercises.filter(ex => !usedExerciseIds.has(ex.id)).slice(0, 1);
-  for (const abs of remainingAbs) {
-    const absWeight = findSimilarExerciseWeight(abs, historyAnalysis.progressionAnalysis);
-    const sets = isDurationBased(abs) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
-      Array(3).fill({ type: 'normal', reps: 10, weight_kg: absWeight });
-
-    allExercises.push({
-      exercise_template_id: abs.id,
-      superset_id: null,
-      rest_seconds: 60,
-      notes: "Abs finisher – controlled reps",
-      sets
-    });
-
-    usedExerciseIds.add(abs.id);
-    if (allExercises.length >= 8) break;
-  }
-
-  if (allExercises.length < 6) {
-    const extra = validExercises.concat(validAbsExercises)
-      .filter(ex => !usedExerciseIds.has(ex.id))
-      .slice(0, 6 - allExercises.length);
-    for (const ex of extra) {
-      const weight = findSimilarExerciseWeight(ex, historyAnalysis.progressionAnalysis);
-      const sets = isDurationBased(ex) ? Array(3).fill({ type: 'normal', duration_seconds: 45, weight_kg: 0 }) :
-        Array(3).fill({ type: 'normal', reps: 10, weight_kg: weight });
-      allExercises.push({
-        exercise_template_id: ex.id,
-        superset_id: null,
-        rest_seconds: 60,
-        notes: "Extra – controlled reps",
-        sets
-      });
-      usedExerciseIds.add(ex.id);
-      if (allExercises.length >= 8) break;
-    }
-  }
-
-  if (allExercises.length > 8) {
-    allExercises.length = 8;
-    console.warn("⚠️ Routine trimmed to 8 exercises.");
+  if (allExercises.length < 12) {
+    console.warn(`⚠️ Only ${allExercises.length}/12 exercises selected. Routine may be incomplete.`);
   }
 
   const deduped = [];
@@ -841,7 +845,7 @@ async function autoplan({ workouts, templates, routines }) {
         routine = await updateRoutine(existingRoutine.id, 'Cardio', cardioExercises, absExercises);
       } else {
         const mainExercises = pickExercises(workouts, exerciseTemplates, muscleTargets[workoutType], historyAnalysis.recentTitles, historyAnalysis.progressionAnalysis, varietyFilter, 6);
-        const absExercises = pickAbsExercises(workouts, exerciseTemplates, historyAnalysis.recentTitles, 3);
+        const absExercises = pickAbsExercises(workouts, exerciseTemplates, historyAnalysis.recentTitles, 6); // Increased to 6 for supersets
         routine = await updateRoutine(existingRoutine.id, workoutType, mainExercises, absExercises);
       }
     } else {
@@ -852,7 +856,7 @@ async function autoplan({ workouts, templates, routines }) {
         routine = await createRoutine('Cardio', cardioExercises, absExercises);
       } else {
         const mainExercises = pickExercises(workouts, exerciseTemplates, muscleTargets[workoutType], historyAnalysis.recentTitles, historyAnalysis.progressionAnalysis, varietyFilter, 6);
-        const absExercises = pickAbsExercises(workouts, exerciseTemplates, historyAnalysis.recentTitles, 3);
+        const absExercises = pickAbsExercises(workouts, exerciseTemplates, historyAnalysis.recentTitles, 6); // Increased to 6 for supersets
         routine = await createRoutine(workoutType, mainExercises, absExercises);
       }
     }
@@ -863,10 +867,10 @@ async function autoplan({ workouts, templates, routines }) {
     } else {
       exercises = routine.exercises || (routine.routine && routine.routine.exercises) || [];
     }
-    if (exercises.length < 6 && workoutType !== "Cardio") {
+    if (exercises.length < 12 && workoutType !== "Cardio") {
       console.warn(`⚠️ Routine has only ${exercises.length} exercises. Retrying with relaxed filters...`);
       const mainExercises = pickExercises(workouts, exerciseTemplates, muscleTargets[workoutType], new Set(), historyAnalysis.progressionAnalysis, () => true, 6);
-      const absExercises = pickAbsExercises(workouts, exerciseTemplates, new Set(), 3);
+      const absExercises = pickAbsExercises(workouts, exerciseTemplates, new Set(), 6);
       routine = existingRoutine && isValidRoutine
         ? await updateRoutine(existingRoutine.id, workoutType, mainExercises, absExercises)
         : await createRoutine(workoutType, mainExercises, absExercises);
