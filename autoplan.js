@@ -173,7 +173,8 @@ function analyzeHistory(workouts) {
   };
 }
 
-function determineWorkoutTypeByLastHit(workouts = []) {
+function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
+
   const splitMap = {
     Push: ['chest', 'shoulders', 'triceps'],
     Pull: ['lats', 'upper back', 'biceps', 'rear delts'],
@@ -702,7 +703,8 @@ async function autoplan({ workouts, templates, routines }) {
     historyAnalysis = analyzeHistory(workouts || []);
     const varietyFilter = filterForVariety(workouts || []);
     const lastCompletedWorkout = workouts && workouts.length > 0 ? workouts[0] : null;
-    const workoutType = determineWorkoutTypeByLastHit(workouts);
+    const workoutType = determineWorkoutTypeByLastHit(workouts, exerciseTemplates);
+
 
 
     const muscleGroups = muscleTargets[workoutType];
