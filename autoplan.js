@@ -706,7 +706,8 @@ async function autoplan({ workouts, templates, routines }) {
     historyAnalysis = analyzeHistory(workouts || []);
     const varietyFilter = filterForVariety(workouts || []);
     const lastCompletedWorkout = workouts && workouts.length > 0 ? workouts[0] : null;
-    const workoutType = getWeeklyTargetSplit();
+    const workoutType = determineWorkoutType(historyAnalysis, lastCompletedWorkout, workouts);
+
     const muscleGroups = muscleTargets[workoutType];
     console.log("🧠 Split selected:", workoutType);
 
