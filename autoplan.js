@@ -174,7 +174,6 @@ function analyzeHistory(workouts) {
 }
 
 function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
-
   const splitMap = {
     Push: ['chest', 'shoulders', 'triceps'],
     Pull: ['lats', 'upper back', 'biceps', 'rear delts'],
@@ -191,7 +190,6 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
 
   for (const workout of workouts) {
     const workoutDate = new Date(workout.start_time);
-
     const splitsTouched = new Set();
 
     for (const exercise of workout.exercises) {
@@ -225,6 +223,7 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
   console.log(`📅 Smart Split: ${chosen.split} (last hit ${chosen.daysAgo} days ago)`);
   return chosen.split;
 }
+
 
 
 
