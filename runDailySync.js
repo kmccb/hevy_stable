@@ -264,26 +264,31 @@ async function runDailySync(isCachePriming = false) {
     console.log(`📊 All macros fetched: ${allMacros.length} entries`);
 
     console.log("📈 Generating charts...");
-const weightChartBase = await generateWeightChart(allMacros);
-const stepsChartBase = await generateStepsChart(allMacros);
-const macrosChartBase = await generateMacrosChart(allMacros);
-let calorieChartBase;
-try {
-  calorieChartBase = await generateCaloriesChart(allMacros);
-  console.log("🔍 Calorie chart buffer generated:", calorieChartBase?.buffer ? "Buffer exists" : "Buffer is null");
-  if (calorieChartBase?.buffer && calorieChartBase.buffer.length < 1000) {
-    console.log("Warning: Calorie chart buffer is suspiciously small. Setting to null as workaround.");
-    calorieChartBase.buffer = null;
-  }
-} catch (err) {
-  console.error("❌ Error generating calorie chart:", err.message);
-  calorieChartBase = { buffer: null };
-}
-
-// Add debug logging for steps
-const stepsValues = allMacros.map(d => ({ date: d.date, value: d.steps.replace(/[^0-9.]/g, '') }));
-console.log("🔍 Raw steps values for chart:", stepsValues);
-console.log("🔍 Steps chart base buffer:", stepsChartBase?.buffer ? stepsChartBase.buffer.toString('base64').substring(0, 100) + "..." : "Buffer is null");
+    const weightChartBase = await generateWeightChart(allMacros);
+    const stepsChartBase = await generateStepsChart(allMacros);
+    const macrosChartBase = await generateMacrosChart(allMacros);
+    let calorieChartBase;
+    try {
+      calorieChartBase = await generateCaloriesChart(allMacros);
+      console.log("🔍 Calorie chart buffer generated:", calorieChartBase?.buffer ? "Buffer exists" : "Buffer is null");
+      if (calorieChartBase?.buffer && calorieChartBase.buffer.length < 1000) {
+        console.log("Warning: Calorie chart buffer is suspiciously small. Setting to null as workaround.");
+        calorieChartBase.buffer = null;
+      }
+    } catch (err) {
+      console.error("❌ Error generating calorie chart:", err.message);
+      calorieChartBase = { buffer: null };
+    }
+    
+    // Enhanced step logging
+    const stepsValues = allMacros.map(d => ({
+      date: d.date,
+      value: d.steps ? d.steps.replace(/[^0-9.]/g, '') : (d.exercises?.find(e => e.title === 'Walking')?.sets?.reduce((sum, s) => sum + (s.distance_meters || 0), 0) || 0)
+    }));
+    console.log("🔍 Raw steps values for chart:", stepsValues);
+    console.log("🔍 Steps chart base buffer:", stepsChartBase?.buffer ? stepsChartBase.buffer.toString('base64').substring(0, 100) + "..." : "Buffer is null");
+    
+    // ... (rest of the code remains unchanged)
 
     const metrics = computeMetrics(allMacros, workouts);
 
