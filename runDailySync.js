@@ -33,6 +33,7 @@ function normalizeDate(date) {
     console.warn("normalizeDate: Date is null or undefined");
     return null;
   }
+  
 
   try {
     let d;
@@ -286,10 +287,8 @@ async function runDailySync(isCachePriming = false) {
       value: d.steps ? d.steps.replace(/[^0-9.]/g, '') : (d.exercises?.find(e => e.title === 'Walking')?.sets?.reduce((sum, s) => sum + (s.distance_meters || 0), 0) || 0)
     }));
     console.log("🔍 Raw steps values for chart:", stepsValues);
-    console.log("🔍 Steps chart base buffer:", stepsChartBase?.buffer ? stepsChartBase.buffer.toString('base64').substring(0, 100) + "..." : "Buffer is null");
+    // console.log("🔍 Steps chart base buffer:", stepsChartBase?.buffer ? stepsChartBase.buffer.toString('base64').substring(0, 100) + "..." : "Buffer is null");
     
-    // ... (rest of the code remains unchanged)
-
     const metrics = computeMetrics(allMacros, workouts);
 
     const weightChart = {

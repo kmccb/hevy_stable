@@ -59,7 +59,7 @@ function formatWorkoutForEmail(workout) {
  * @returns {string} - Formatted number with commas or 'N/A'.
  */
 function formatNumber(num) {
-  console.log(`Formatting number: ${num} (type: ${typeof num})`);
+  // console.log(`Formatting number: ${num} (type: ${typeof num})`);
   const cleanedNum = typeof num === 'string' ? num.replace(/[^0-9.]/g, '') : num;
   const parsedNum = parseFloat(cleanedNum);
   if (Number.isFinite(parsedNum)) {
@@ -317,15 +317,15 @@ function generateHtmlSummary(
   };
   const yesterdayCalories = estimateCalories(macros);
 
-  console.log(`Final formatted values - Calories: ${formatNumber(macroValues.calories)}, Steps: ${formatNumber(macroValues.steps)}`);
+  // console.log(`Final formatted values - Calories: ${formatNumber(macroValues.calories)}, Steps: ${formatNumber(macroValues.steps)}`);
 
-  console.log("Chart objects in generateHtmlSummary:", {
-    weightChart: { buffer: !!weightChart?.buffer, average: weightChart?.average, trend: weightChart?.trend },
-    stepsChart: { buffer: !!stepsChart?.buffer, average: stepsChart?.average, trend: stepsChart?.trend },
-    macrosChart: { buffer: !!macrosChart?.buffer, average: macrosChart?.average, trend: macrosChart?.trend },
-    calorieChart: { buffer: !!calorieChart?.buffer, average: calorieChart?.average, trend: calorieChart?.trend },
-    workoutChart: { buffer: !!workoutChart?.buffer, average: workoutChart?.average, trend: workoutChart?.trend }
-  });
+  // console.log("Chart objects in generateHtmlSummary:", {
+    // weightChart: { buffer: !!weightChart?.buffer, average: weightChart?.average, trend: weightChart?.trend },
+    // stepsChart: { buffer: !!stepsChart?.buffer, average: stepsChart?.average, trend: stepsChart?.trend },
+    // macrosChart: { buffer: !!macrosChart?.buffer, average: macrosChart?.average, trend: macrosChart?.trend },
+    // calorieChart: { buffer: !!calorieChart?.buffer, average: calorieChart?.average, trend: calorieChart?.trend },
+    // workoutChart: { buffer: !!workoutChart?.buffer, average: workoutChart?.average, trend: workoutChart?.trend }
+  // });
 
   const stepsAvg = stepsChart && typeof stepsChart.average === 'number' ? formatNumber(stepsChart.average) : 'N/A';
   const macrosProtein = macrosChart?.average?.protein ? formatNumber(macrosChart.average.protein) : 'N/A';
