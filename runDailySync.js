@@ -286,7 +286,7 @@ async function runDailySync(isCachePriming = false) {
       date: d.date,
       value: d.steps ? d.steps.replace(/[^0-9.]/g, '') : (d.exercises?.find(e => e.title === 'Walking')?.sets?.reduce((sum, s) => sum + (s.distance_meters || 0), 0) || 0)
     }));
-    console.log("🔍 Raw steps values for chart:", stepsValues);
+    // console.log("🔍 Raw steps values for chart:", stepsValues);
     // console.log("🔍 Steps chart base buffer:", stepsChartBase?.buffer ? stepsChartBase.buffer.toString('base64').substring(0, 100) + "..." : "Buffer is null");
     
     const metrics = computeMetrics(allMacros, workouts);

@@ -23,7 +23,11 @@ async function fetchAllWorkouts() {
         }
       });
 
-      const workouts = response.data.workouts || [];
+      const workouts = (response.data.workouts || []).map(w => ({
+        ...w,
+        date: w.start_time  // inject a valid date field
+      }));
+      
       if (workouts.length === 0) break;
 
       allWorkouts.push(...workouts);
