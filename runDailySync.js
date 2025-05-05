@@ -151,7 +151,7 @@ function computeMetrics(allMacros, workouts) {
   const fatTrend = calculateTrendSlope(fatValues);
 
   const calorieValues = sortedData.map(d => ({ date: d.date, value: d.calories ? d.calories.replace(/[^0-9.]/g, '') : null }));
-  console.log("🔍 Calorie data for chart:", calorieValues.filter(v => v.value !== null && v.value !== ""));
+  // console.log("🔍 Calorie data for chart:", calorieValues.filter(v => v.value !== null && v.value !== ""));
   const calorieAverage = computeAverage(calorieValues.map(d => d.value));
   const calorieTrend = calculateTrendSlope(calorieValues);
 
@@ -258,7 +258,7 @@ async function runDailySync(isCachePriming = false) {
     console.log("📊 Fetching macros...");
     const macros = await getMacrosFromSheet();
     if (!macros) throw new Error("No macros found for yesterday.");
-    console.log(`📊 Macros fetched: ${JSON.stringify(macros)}`);
+    // console.log(`📊 Macros fetched: ${JSON.stringify(macros)}`);
 
     console.log("📊 Fetching all macros...");
     const allMacros = await getAllMacrosFromSheet();
@@ -271,7 +271,7 @@ async function runDailySync(isCachePriming = false) {
     let calorieChartBase;
     try {
       calorieChartBase = await generateCaloriesChart(allMacros);
-      console.log("🔍 Calorie chart buffer generated:", calorieChartBase?.buffer ? "Buffer exists" : "Buffer is null");
+//      console.log("🔍 Calorie chart buffer generated:", calorieChartBase?.buffer ? "Buffer exists" : "Buffer is null");
       if (calorieChartBase?.buffer && calorieChartBase.buffer.length < 1000) {
         console.log("Warning: Calorie chart buffer is suspiciously small. Setting to null as workaround.");
         calorieChartBase.buffer = null;
@@ -321,14 +321,14 @@ async function runDailySync(isCachePriming = false) {
       trend: metrics.workouts.trend
     };
 
-    console.log("📈 Charts generated successfully");
-    console.log("📈 Chart objects:", {
-      weightChart: { buffer: !!weightChart.buffer, average: weightChart.average, trend: weightChart.trend },
-      stepsChart: { buffer: !!stepsChart.buffer, average: stepsChart.average, trend: stepsChart.trend },
-      macrosChart: { buffer: !!macrosChart.buffer, average: macrosChart.average, trend: macrosChart.trend },
-      calorieChart: { buffer: !!calorieChart.buffer, average: calorieChart.average, trend: calorieChart.trend },
-      workoutChart: { buffer: !!workoutChart.buffer, average: workoutChart.average, trend: workoutChart.trend }
-    });
+    // console.log("📈 Charts generated successfully");
+    // console.log("📈 Chart objects:", {
+      // weightChart: { buffer: !!weightChart.buffer, average: weightChart.average, trend: weightChart.trend },
+      // stepsChart: { buffer: !!stepsChart.buffer, average: stepsChart.average, trend: stepsChart.trend },
+      // // macrosChart: { buffer: !!macrosChart.buffer, average: macrosChart.average, trend: macrosChart.trend },
+      // calorieChart: { buffer: !!calorieChart.buffer, average: calorieChart.average, trend: calorieChart.trend },
+      // workoutChart: { buffer: !!workoutChart.buffer, average: workoutChart.average, trend: workoutChart.trend }
+    // });
 
     console.log("🧠 Generating trainer insights...");
     const trainerInsights = recentWorkouts.length === 0 ? [] : analyzeWorkouts(recentWorkouts);
