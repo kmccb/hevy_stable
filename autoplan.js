@@ -17,7 +17,7 @@ const KG_TO_LBS = 2.20462;
 const muscleTargets = {
   Push: ['Chest', 'Shoulders', 'Triceps'],
   Pull: ['Lats', 'Upper Back', 'Biceps', 'Rear Delts'],
-  Legs: ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  Legs: ['quadriceps', 'Hamstrings', 'Glutes', 'Calves'],
   Core: ['Abdominals', 'Obliques', 'Full Body', 'Lower Back'],
   Cardio: ['Cardio'],
   Abs: ['Abdominals', 'Obliques']
@@ -31,7 +31,7 @@ const muscleToWorkoutType = {
   upper_back: 'Pull',
   biceps: 'Pull',
   rear_delts: 'Pull',
-  quads: 'Legs',
+  quadriceps: 'Legs',
   hamstrings: 'Legs',
   glutes: 'Legs',
   calves: 'Legs',
@@ -116,7 +116,7 @@ function analyzeHistory(workouts) {
         const splitsTouched = new Set();
         if (['chest', 'shoulders', 'triceps'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Push');
         if (['lats', 'upper_back', 'biceps', 'rear_delts'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Pull');
-        if (['quads', 'hamstrings', 'glutes', 'calves', 'full_body'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Legs');
+        if (['quadriceps', 'hamstrings', 'glutes', 'calves', 'full_body'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Legs');
         if (['abdominals', 'obliques', 'core', 'lower_back'].some(m => primaryMuscle.includes(m))) splitsTouched.add('Core');
 
         splitsTouched.forEach(split => {
@@ -214,7 +214,7 @@ function determineWorkoutTypeByLastHit(workouts = [], exerciseTemplates = []) {
   const splitMap = {
     Push: ['chest', 'shoulders', 'triceps'],
     Pull: ['lats', 'upper_back', 'biceps', 'rear_delts'],
-    Legs: ['quads', 'hamstrings', 'glutes', 'calves', 'full_body'],
+    Legs: ['quadriceps', 'hamstrings', 'glutes', 'calves', 'full_body'],
     Core: ['abdominals', 'obliques', 'core', 'lower_back']
   };
 
@@ -297,10 +297,10 @@ function pickExercises(workouts, templates, muscleGroups, recentTitles, progress
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const isLegDay = muscleGroups.some(m =>
-    ['quads', 'glutes', 'hamstrings', 'calves'].includes(m.toLowerCase())
+    ['quadriceps', 'glutes', 'hamstrings', 'calves'].includes(m.toLowerCase())
   );
 
-  const legMuscleGroups = ['quads', 'glutes', 'hamstrings', 'calves'];
+  const legMuscleGroups = ['quadriceps', 'glutes', 'hamstrings', 'calves'];
   const legKeywords = [
     'press', 'squat', 'lunge', 'extension', 'curl',
     'deadlift', 'rdl', 'step up', 'hip thrust', 'glute bridge', 'calf'
